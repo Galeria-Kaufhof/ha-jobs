@@ -13,14 +13,18 @@ class LockRepositorySpec extends CassandraSpec {
 
   private lazy val repo = new LockRepository(session, TestLockTypes)
 
-  override protected def beforeEach(): Unit = await(repo.clear())
-
-  "LockRepository" ignore {
-    "save and delete lock entries" in {
+  override protected def beforeEach(): Unit = {
+    await(repo.clear())
+    eventually {
       await(repo.getAll()) should be(Seq.empty)
+    }
+  }
+
+  "LockRepository" must {
+    "save and delete lock entries" in {
       await(repo.save(JobType1))
       eventually{
-        await(repo.getIdForType(JobType1)) should not be (None)
+        await(repo.getIdForType(JobType1)) should be ('defined)
       }
       await(repo.delete(JobType1))
       eventually{
@@ -29,7 +33,6 @@ class LockRepositorySpec extends CassandraSpec {
     }
 
     "return all locks" in {
-      await(repo.getAll()) should be(Seq.empty)
       val uuid = UUIDs.timeBased()
       val uuid2 = UUIDs.timeBased()
 
