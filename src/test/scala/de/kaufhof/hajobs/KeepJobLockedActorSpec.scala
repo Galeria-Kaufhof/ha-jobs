@@ -38,7 +38,7 @@ class KeepJobLockedActorSpec(_system: ActorSystem) extends TestKit(_system) with
       var cancelled = false
       val lockRepository = mock[LockRepository]
       when(lockRepository.updateLock(any[JobType], any[UUID], any[Duration])).thenReturn(Future.successful(false))
-      aut = system.actorOf(KeepJobLockedActor.props(lockRepository, JobType.KpiImporter, UUIDs.timeBased(), 1 second, () => cancelled = true))
+      aut = system.actorOf(KeepJobLockedActor.props(lockRepository, JobType1, UUIDs.timeBased(), 1 second, () => cancelled = true))
 
       eventually {
         cancelled should be (true)
@@ -49,7 +49,7 @@ class KeepJobLockedActorSpec(_system: ActorSystem) extends TestKit(_system) with
       var cancelled = false
       val lockRepository = mock[LockRepository]
       when(lockRepository.updateLock(any[JobType], any[UUID], any[Duration])).thenThrow(new RuntimeException("Simulated Exception"))
-      aut = system.actorOf(KeepJobLockedActor.props(lockRepository, JobType.KpiImporter, UUIDs.timeBased(), 1 second, () => cancelled = true))
+      aut = system.actorOf(KeepJobLockedActor.props(lockRepository, JobType1, UUIDs.timeBased(), 1 second, () => cancelled = true))
 
       eventually {
         cancelled should be (true)
@@ -60,7 +60,7 @@ class KeepJobLockedActorSpec(_system: ActorSystem) extends TestKit(_system) with
       var cancelled = false
       val lockRepository = mock[LockRepository]
       when(lockRepository.updateLock(any[JobType], any[UUID], any[Duration])).thenReturn(Future.failed(new RuntimeException("Simulated Exception")))
-      aut = system.actorOf(KeepJobLockedActor.props(lockRepository, JobType.KpiImporter, UUIDs.timeBased(), 1 second, () => cancelled = true))
+      aut = system.actorOf(KeepJobLockedActor.props(lockRepository, JobType1, UUIDs.timeBased(), 1 second, () => cancelled = true))
 
       eventually {
         cancelled should be (true)

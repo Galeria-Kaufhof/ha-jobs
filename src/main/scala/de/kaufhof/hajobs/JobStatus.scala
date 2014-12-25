@@ -7,7 +7,6 @@ import JobResult.JobResult
 import JobState.JobState
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
-import play.api.Logger
 import play.api.libs.json.{JsValue, _}
 
 import scala.util.Try
@@ -52,58 +51,54 @@ object JobResult extends Enumeration {
  * a jobType is just printed. When storing a reference to a JobType e.g. in C*, the name property
  * must be used instead of toString (like it's done for Enumerations).
  */
-sealed trait JobType {
-  def name: String
-  def lockType: LockType
-}
+case class JobType(name: String, lockType: LockType)
 
 object JobType {
 
-  private val logger = Logger(classOf[JobType])
-
-  abstract class ConfiguredJobType(override val name: String, override val lockType: LockType) extends JobType
-  case object JobSupervisor extends ConfiguredJobType("supervisor", LockType.JobSupervisor)
-  case object ProductImporter extends ConfiguredJobType("products", LockType.Product)
-  case object StoererImporter extends ConfiguredJobType("stoerer", LockType.Stoerer)
-  case object KpiImporter extends ConfiguredJobType("kpi", LockType.Kpi)
-  case object DictionaryImporter extends ConfiguredJobType("dictionary", LockType.Dictionary)
-  case object StockFeedImporter extends ConfiguredJobType("stockFeed", LockType.Stock)
-  case object StockSnapshotImporter extends ConfiguredJobType("stockSnapshot", LockType.Stock)
-
-  /** The values of this enumeration as a set.
-   */
-  val values: Seq[JobType] = Seq(JobSupervisor, ProductImporter, StoererImporter, KpiImporter, DictionaryImporter,
-    StockFeedImporter, StockSnapshotImporter)
-
-  /**
-   * Resolves a JobType by name. Throws a NoSuchElementException if there's no JobType
-   * with the given name. In this case exception is preferred over returning an Option to be
-   * more conformant with the other JobStatus enums.
-   */
-  @throws[NoSuchElementException]
-  def withName(name: String): JobType = name match {
-    case JobSupervisor.name => JobSupervisor
-    case ProductImporter.name => ProductImporter
-    case StoererImporter.name => StoererImporter
-    case KpiImporter.name => KpiImporter
-    case DictionaryImporter.name => DictionaryImporter
-    case StockFeedImporter.name => StockFeedImporter
-    case StockSnapshotImporter.name => StockSnapshotImporter
-    case _ =>
-      logger.warn(s"Could not find JobType with name '$name' (known names: ${values.map(_.name).mkString(",")}).")
-      throw new NoSuchElementException(s"Could not find JobType with name '$name'.")
-  }
-
-  implicit val jobTypeReads = new Reads[JobType] {
+  implicit def jobTypeReads(implicit jobTypes: JobTypes) = new Reads[JobType] {
     def reads(json: JsValue): JsResult[JobType] = json match {
-      case JsString(s) => Try(withName(s)).map(JsSuccess(_)).getOrElse(JsError(s"No JobType found with name '$s'"))
+      case JsString(s) => Try(jobTypes(s)).map(JsSuccess(_)).getOrElse(JsError(s"No JobType found with name '$s'"))
       case _ => JsError("String value expected")
     }
   }
 
-  implicit def enumWrites: Writes[JobType] = new Writes[JobType] {
+  implicit val jobTypeWrites: Writes[JobType] = new Writes[JobType] {
     def writes(v: JobType): JsValue = JsString(v.name)
   }
+
+}
+
+trait JobTypes {
+
+  import JobTypes._
+
+  /**
+   * Resolves a JobType by name. Compares built in JobTypes and if none matched
+   * delegates to [[byName]].
+   *
+   * Throws a NoSuchElementException if there's no JobType
+   * with the given name. In this case exception is preferred over returning an Option to be
+   * more conformant with the other JobStatus enums.
+   */
+  @throws[NoSuchElementException]
+  final def apply(name: String): JobType = lookup(name)
+
+  private val lookup: PartialFunction[String, JobType] = byName orElse {
+    case JobSupervisor.name => JobSupervisor
+    case unknown => throw new NoSuchElementException(s"Could not find JobType with name '$unknown'.")
+  }
+
+  /**
+   * Resolves a JobType by name.
+   */
+  protected def byName: PartialFunction[String, JobType]
+
+}
+
+object JobTypes {
+
+  object JobSupervisor extends JobType("supervisor", lockType = LockTypes.JobSupervisorLock)
+
 }
 
 object JobStatus {
@@ -126,7 +121,9 @@ object JobStatus {
     }
   }
 
-  implicit val jobStatusFormat = Json.format[JobStatus]
+  implicit def jobStatusReads(implicit jobTypes: JobTypes) = Json.reads[JobStatus]
+
+  implicit val jobStatusWrites = Json.writes[JobStatus]
 
   private val stateResultMapping = Map[JobState, JobResult](
     JobState.Running -> JobResult.Pending,

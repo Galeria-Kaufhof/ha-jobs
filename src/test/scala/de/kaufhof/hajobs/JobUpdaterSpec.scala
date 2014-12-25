@@ -16,7 +16,7 @@ class JobUpdaterSpec extends StandardSpec {
   private val jobStatusRepository = mock[JobStatusRepository]
 
   "update jobs in JobUpdater" should {
-    val job = JobStatus(UUIDs.timeBased(), JobType.KpiImporter, UUIDs.timeBased(), JobState.Running, JobResult.Pending, DateTime.now(), None)
+    val job = JobStatus(UUIDs.timeBased(), JobType1, UUIDs.timeBased(), JobState.Running, JobResult.Pending, DateTime.now(), None)
 
     "set jobStatus of dead jobs to dead" in {
       when(lockRepository.getAll()).thenReturn(Future.successful(Seq.empty))

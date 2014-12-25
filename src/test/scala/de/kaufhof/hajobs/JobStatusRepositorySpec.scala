@@ -14,9 +14,9 @@ import scala.language.postfixOps
 
 class JobStatusRepositorySpec extends CassandraSpec {
 
-  private lazy val repo = new JobStatusRepository(session, ttl = 1.minute)
-  private val type1 = JobType.KpiImporter
-  private val type2 = JobType.ProductImporter
+  private lazy val repo = new JobStatusRepository(session, ttl = 1.minute, TestJobTypes)
+  private val type1 = JobType1
+  private val type2 = JobType2
   private val anyTriggerId = UUIDs.timeBased()
 
   override protected def beforeEach(): Unit = {

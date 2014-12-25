@@ -8,7 +8,6 @@ import CassandraUtils._
 import com.datastax.driver.core._
 import com.datastax.driver.core.querybuilder.QueryBuilder._
 import com.datastax.driver.core.querybuilder.{Insert, QueryBuilder}
-import de.kaufhof.hajobs.utils.CassandraUtils
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 
 import scala.collection.JavaConversions._
@@ -29,7 +28,7 @@ import scala.util.Try
  *
  * @param session
  */
-class LockRepository(session: Session) {
+class LockRepository(session: Session, lockTypes: LockTypes) {
 
   private val Table = "lock"
 
@@ -135,7 +134,7 @@ class LockRepository(session: Session) {
     session.executeAsync(query).map(rs =>
       rs.all().foldLeft(Seq.empty[Lock]) { (res, row) =>
         val lockTypeName = row.getString(LockTypeCol)
-        Try(LockType.withName(lockTypeName))
+        Try(lockTypes(lockTypeName))
           .map(lockType => res :+ Lock(lockType, row.getUUID(LockCol)))
           .getOrElse(res)
       }

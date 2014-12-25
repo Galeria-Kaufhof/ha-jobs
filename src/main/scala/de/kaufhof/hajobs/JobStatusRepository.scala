@@ -9,7 +9,6 @@ import de.kaufhof.hajobs.utils.CassandraUtils
 import CassandraUtils._
 import com.datastax.driver.core._
 import de.kaufhof.hajobs.JobState._
-import de.kaufhof.hajobs.utils.CassandraUtils
 import org.joda.time.DateTime
 import play.api.Logger
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
@@ -25,7 +24,9 @@ import scala.util.control.NonFatal
  * to get consistent Job data from Cassandra. This is necessary to prevent
  * the JobSupervisor from setting Finished Jobs to Dead Jobs
  */
-class JobStatusRepository(session: Session, ttl: FiniteDuration = 14.days) {
+class JobStatusRepository(session: Session,
+                          ttl: FiniteDuration = 14.days,
+                          jobTypes: JobTypes) {
 
   private val logger = Logger(getClass)
 
@@ -160,7 +161,7 @@ class JobStatusRepository(session: Session, ttl: FiniteDuration = 14.days) {
     try {
       Some(JobStatus(
         row.getUUID(TriggerIdColumn),
-        JobType.withName(row.getString(JobTypeColumn)),
+        jobTypes(row.getString(JobTypeColumn)),
         row.getUUID(JobIdColumn),
         JobState.withName(row.getString(JobStateColumn)),
         JobResult.withName(row.getString(JobResultColumn)),

@@ -16,7 +16,7 @@ import scala.util.{Failure, Success}
 class JobSupervisor(jobManager: JobManager,
                     jobUpdater: JobUpdater,
                     jobStatusRepository: JobStatusRepository,
-                    cronExpression: Option[String] = None) extends Job(JobType.JobSupervisor, jobStatusRepository, 0, cronExpression) {
+                    cronExpression: Option[String] = None) extends Job(JobTypes.JobSupervisor, jobStatusRepository, 0, cronExpression) {
 
   @volatile
   private var isCancelled = false

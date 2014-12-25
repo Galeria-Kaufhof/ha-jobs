@@ -30,7 +30,7 @@ abstract class JobManagerModule extends Module {
   binding to new JobSupervisor(inject[JobManager],
     jobUpdater,
     inject[JobStatusRepository],
-    inject[Configuration].getString(s"job.import.${JobType.JobSupervisor.name}.cron")
+    inject[Configuration].getString(s"job.import.${JobTypes.JobSupervisor.name}.cron")
   )
 
 }

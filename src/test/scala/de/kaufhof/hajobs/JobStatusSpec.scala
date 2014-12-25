@@ -4,7 +4,6 @@ import java.util.UUID._
 
 import de.kaufhof.hajobs.JobResult._
 import de.kaufhof.hajobs.JobState._
-import de.kaufhof.hajobs.JobType._
 import de.kaufhof.hajobs.testutils.StandardSpec
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
@@ -12,17 +11,19 @@ import play.api.libs.json._
 
 class JobStatusSpec extends StandardSpec {
 
+  private implicit val jobTypes = TestJobTypes
+
   "JobStatus JsonFormat" should {
 
     val now = DateTime.now
-    val jobStatus: JobStatus = JobStatus(randomUUID(), KpiImporter, randomUUID(), Finished, Success, now, Some(Json.toJson("muhmuh")))
-    val json = JobStatus.jobStatusFormat.writes(jobStatus)
+    val jobStatus: JobStatus = JobStatus(randomUUID(), JobType1, randomUUID(), Finished, Success, now, Some(Json.toJson("muhmuh")))
+    val json = JobStatus.jobStatusWrites.writes(jobStatus)
 
     "render the timestamp in a readable form" in {
       (json \ "jobStatusTs").as[String] should be (now.toString(ISODateTimeFormat.dateTime()))
 
       // verify that everything else is fine
-      JobStatus.jobStatusFormat.reads(json).get should be (jobStatus)
+      JobStatus.jobStatusReads.reads(json).get should be (jobStatus)
     }
 
     "read the timestamp in legacy form (with just the unix timestamp)" in {
@@ -37,7 +38,7 @@ class JobStatusSpec extends StandardSpec {
       (legacyJson \ "jobStatusTs").as[Long] should be (now.getMillis)
 
       // verify that the legacy json can be read
-      JobStatus.jobStatusFormat.reads(legacyJson).get should be (jobStatus)
+      JobStatus.jobStatusReads.reads(legacyJson).get should be (jobStatus)
     }
   }
 

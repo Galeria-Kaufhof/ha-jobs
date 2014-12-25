@@ -29,7 +29,7 @@ class JobSupervisorSpec extends StandardSpec {
   }
 
   "update job state in JobSupervisor" should {
-    val jobStatus = JobStatus(UUIDs.timeBased(), JobType.KpiImporter, UUIDs.timeBased(), JobState.Running, JobResult.Pending, DateTime.now(), None)
+    val jobStatus = JobStatus(UUIDs.timeBased(), JobType1, UUIDs.timeBased(), JobState.Running, JobResult.Pending, DateTime.now(), None)
     val jobManager = mock[JobManager]
 
     "change the state of failed jobs to FAILED" in {
@@ -75,7 +75,7 @@ class JobSupervisorSpec extends StandardSpec {
 
   "retrigger job in JobSupervisor" should {
     val someJob = mock[Job]
-    when(someJob.jobType).thenReturn(JobType.KpiImporter)
+    when(someJob.jobType).thenReturn(JobType1)
     when(someJob.retriggerCount).thenReturn(2)
 
     val jobManager = mock[JobManager]
@@ -91,8 +91,8 @@ class JobSupervisorSpec extends StandardSpec {
     }
 
     "do nothing if one job of the last trigger id ended successfully (even if a trigger id earlier failed))" in {
-      val job1 = JobStatus(UUIDs.timeBased(), JobType.KpiImporter, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
-      val job2 = JobStatus(UUIDs.timeBased(), JobType.KpiImporter, UUIDs.timeBased(), JobState.Finished, JobResult.Success, DateTime.now)
+      val job1 = JobStatus(UUIDs.timeBased(), JobType1, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
+      val job2 = JobStatus(UUIDs.timeBased(), JobType1, UUIDs.timeBased(), JobState.Finished, JobResult.Success, DateTime.now)
       when(jobStatusRepository.getAllMetadata()).thenReturn(Future.successful(List(job1, job2)))
       val jobUpdater = new JobUpdater(lockRepository, jobStatusRepository)
       val sut = new JobSupervisor(jobManager, jobUpdater, jobStatusRepository)
@@ -101,7 +101,7 @@ class JobSupervisorSpec extends StandardSpec {
     }
 
     "retrigger a job if no job of the last trigger was successful and retrigger size is not reached" in {
-      val job1 = JobStatus(UUIDs.timeBased(), JobType.KpiImporter, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
+      val job1 = JobStatus(UUIDs.timeBased(), JobType1, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
       when(jobStatusRepository.getAllMetadata()).thenReturn(Future.successful(List(job1)))
       val jobUpdater = new JobUpdater(lockRepository, jobStatusRepository)
       val sut = new JobSupervisor(jobManager, jobUpdater, jobStatusRepository)
@@ -110,7 +110,7 @@ class JobSupervisorSpec extends StandardSpec {
     }
 
     "do nothing if no job of the last trigger was successful and retrigger size is reached" in {
-      val job1 = JobStatus(UUIDs.timeBased(), JobType.KpiImporter, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
+      val job1 = JobStatus(UUIDs.timeBased(), JobType1, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
       val job2 = job1.copy(jobStatusTs = DateTime.now.minusMillis(1))
       val job3 = job1.copy(jobStatusTs = DateTime.now.minusMillis(2))
       val job4 = job1.copy(jobStatusTs = DateTime.now.minusMillis(2))

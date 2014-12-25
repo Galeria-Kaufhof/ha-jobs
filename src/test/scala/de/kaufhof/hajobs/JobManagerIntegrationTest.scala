@@ -9,9 +9,9 @@ import scala.concurrent.Future
 import scala.language.postfixOps
 
 class JobManagerIntegrationTest extends CassandraSpec with DefaultAwaitTimeout with FutureAwaits {
-  private lazy val jobStatusRepository = new JobStatusRepository(session)
+  private lazy val jobStatusRepository = new JobStatusRepository(session, jobTypes = JobManagerIntegrationTest.TestJobTypes)
 
-  private lazy val lockRepository = new LockRepository(session)
+  private lazy val lockRepository = new LockRepository(session, TestLockTypes)
 
   "JobManager locking" should {
     // TODO: Too flaky on deployment pipeline, whats the problem
@@ -28,7 +28,7 @@ class JobManagerIntegrationTest extends CassandraSpec with DefaultAwaitTimeout w
 }
 
 object JobManagerIntegrationTest {
-  class StockSnapshotJob(jobStatusRepository: JobStatusRepository, cdl: CountDownLatch) extends Job(JobType.StockSnapshotImporter, jobStatusRepository, 3) {
+  class Job1(jobStatusRepository: JobStatusRepository, cdl: CountDownLatch) extends Job(JobType1, jobStatusRepository, 3) {
     override def run()(implicit context: JobContext): Future[JobStartStatus] = {
       cdl.await()
       Future.successful(Started(context.jobId))
@@ -37,11 +37,20 @@ object JobManagerIntegrationTest {
     override def cancel(): Unit = ???
   }
 
-  class StockFeedJob(jobStatusRepository: JobStatusRepository) extends Job(JobType.StockFeedImporter, jobStatusRepository, 3) {
+  object JobType12 extends JobType("testJob12", JobType1.lockType)
+
+  class Job2(jobStatusRepository: JobStatusRepository) extends Job(JobType12, jobStatusRepository, 3) {
     override def run()(implicit context: JobContext): Future[JobStartStatus] = {
       Future.successful(Started(context.jobId))
     }
 
     override def cancel(): Unit = ???
+  }
+
+  object TestJobTypes extends JobTypes {
+    override protected def byName: PartialFunction[String, JobType] = {
+      case JobType1.name => JobType1
+      case JobType12.name => JobType12
+    }
   }
 }
