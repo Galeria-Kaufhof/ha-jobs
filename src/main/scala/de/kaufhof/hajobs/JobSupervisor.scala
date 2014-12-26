@@ -13,10 +13,15 @@ import scala.util.{Failure, Success}
  * the job is considered to be crashed (because a job must regularly update the corresponding
  * lock).
  */
-class JobSupervisor(jobManager: JobManager,
+class JobSupervisor(jobManager: => JobManager,
                     jobUpdater: JobUpdater,
                     jobStatusRepository: JobStatusRepository,
-                    cronExpression: Option[String] = None) extends Job(JobTypes.JobSupervisor, jobStatusRepository, 0, cronExpression) {
+                    cronExpression: Option[String]) extends Job(JobTypes.JobSupervisor, jobStatusRepository, 0, cronExpression) {
+
+  def this(jobManager: => JobManager,
+           lockRepository: LockRepository,
+           jobStatusRepository: JobStatusRepository,
+           cronExpression: Option[String] = None) = this(jobManager, new JobUpdater(lockRepository, jobStatusRepository), jobStatusRepository, cronExpression)
 
   @volatile
   private var isCancelled = false
