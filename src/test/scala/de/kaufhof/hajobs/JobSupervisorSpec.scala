@@ -19,10 +19,6 @@ class JobSupervisorSpec extends StandardSpec {
 
   private val jobStatusRepository = mock[JobStatusRepository]
 
-  // Increase default timeout for eventually blocks
-  // scalatest initially uses 1/10 of the configured interval
-  private implicit val patienceConfig = PatienceConfig(timeout = 1 second, interval = 100 millis)
-
   override def beforeEach() {
     initializeLockRepo(lockRepository)
     reset(jobStatusRepository)
