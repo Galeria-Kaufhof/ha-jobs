@@ -55,7 +55,7 @@ case class JobType(name: String, lockType: LockType)
 
 object JobType {
 
-  implicit def jobTypeReads(implicit jobTypes: JobTypes) = new Reads[JobType] {
+  implicit def jobTypeReads(implicit jobTypes: JobTypes): Reads[JobType] = new Reads[JobType] {
     def reads(json: JsValue): JsResult[JobType] = json match {
       case JsString(s) => Try(jobTypes(s)).map(JsSuccess(_)).getOrElse(JsError(s"No JobType found with name '$s'"))
       case _ => JsError("String value expected")
@@ -83,7 +83,7 @@ trait JobTypes {
   @throws[NoSuchElementException]
   final def apply(name: String): JobType = lookup(name)
 
-  private val lookup: PartialFunction[String, JobType] = byName orElse {
+  private def lookup: PartialFunction[String, JobType] = byName orElse {
     case JobSupervisor.name => JobSupervisor
     case unknown => throw new NoSuchElementException(s"Could not find JobType with name '$unknown'.")
   }
@@ -98,6 +98,11 @@ trait JobTypes {
 object JobTypes {
 
   object JobSupervisor extends JobType("supervisor", lockType = LockTypes.JobSupervisorLock)
+
+  def apply(jobTypes: JobType*): JobTypes = new JobTypes {
+    private val jobTypesByName = jobTypes.map(jobType => jobType.name -> jobType).toMap
+    override protected def byName: PartialFunction[String, JobType] = jobTypesByName
+  }
 
 }
 
@@ -121,7 +126,7 @@ object JobStatus {
     }
   }
 
-  implicit def jobStatusReads(implicit jobTypes: JobTypes) = Json.reads[JobStatus]
+  implicit def jobStatusReads(implicit jobTypes: JobTypes): Reads[JobStatus] = Json.reads[JobStatus]
 
   implicit val jobStatusWrites = Json.writes[JobStatus]
 

@@ -30,7 +30,7 @@ trait LockTypes {
   @throws[NoSuchElementException]
   final def apply(name: String): LockType = lookup(name)
 
-  private val lookup: PartialFunction[String, LockType] = byName orElse {
+  private def lookup: PartialFunction[String, LockType] = byName orElse {
     case JobSupervisorLock.name => JobSupervisorLock
     case unknown => throw new NoSuchElementException(s"Could not find LockType with name '$unknown'.")
   }
@@ -45,5 +45,10 @@ trait LockTypes {
 object LockTypes {
 
   object JobSupervisorLock extends LockType("supervisor")
+
+  def apply(lockTypes: LockType*): LockTypes = new LockTypes {
+    private val lockTypesByName = lockTypes.map(lockType => lockType.name -> lockType).toMap
+    override protected def byName: PartialFunction[String, LockType] = lockTypesByName
+  }
 
 }
