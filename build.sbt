@@ -1,7 +1,7 @@
 
-name := "cassandra-jobs"
+name := "ha-jobs"
 
-description := "Run (batch) jobs in a cluster, using cassandra for job status and job locking."
+description := "Run distributed, highly available (batch) jobs, with job locking and supervision."
 
 organization := "de.kaufhof"
 
