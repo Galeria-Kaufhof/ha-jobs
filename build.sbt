@@ -42,6 +42,9 @@ resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/release
 
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
+// fork (tests) to free resources. otherwise c* sessions are collected and will OOME at some point
+fork := true
+
 // Publish settings
 publishTo := {
   val nexus = "https://oss.sonatype.org/"
