@@ -1,0 +1,273 @@
+# HA-Jobs
+
+[![Build Status](https://travis-ci.org/Galeria-Kaufhof/ha-jobs.png?branch=master)](https://travis-ci.org/Galeria-Kaufhof/ha-jobs)
+
+Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
+Implemented with Scala, Akka and Cassandra.
+
+### Features:
+
+* Job Locking
+  * Ensures, that a job is run by at most one instance
+  * Locks are automatically released when an instance crashed
+  * When a lock is lost / timed out (e.g. because the jvm is only/mainly doing GC), the job will be canceled so that
+    another instance can step in
+* Job Supervision
+  * When a crashed job is detected, the job will be resumed/retried (maybe by another instance) a configured number of times
+* Job Scheduling
+  * Jobs can be scheduled, the [Quartz](http://quartz-scheduler.org/) scheduler is used for this.
+* Job Status / Reporting
+  * For each job the status and result is stored, jobs can also provide details to be stored
+* Job Management
+  * There's a [Play! Framework](https://www.playframework.com/) controller that provides a REST api for jobs, which
+    allows to start a job, get a list of job executions, and details for a specific job execution.
+
+### Constraints:
+
+* There's no need for work distribution / if a single instance can execute a job.
+
+### Implementation/Solution Details:
+
+Currently for Job Locking Cassandra's lightweight transactions are used, locks are stored with a certain TTL (e.g. 30 seconds)
+in a dedicated table.
+As long as a job is running, an (Akka) actor keeps the lock for the job active.
+When the job completes, the actor is stopped and the lock is released/deleted.
+When the instance running the job crashes, the lock will be deleted due to the used TTL.
+
+Job Supervision is done by a Job, that detects dead jobs and restarts them the configured
+number of times.
+
+There's the `JobManager`, that allows to start or restart a job, and schedules jobs based on their scheduling pattern.
+
+A job must extend `Job`, which has the following interface:
+
+```scala
+abstract class Job(val jobType: JobType,
+                   jobStatusRepository: JobStatusRepository,
+                   val retriggerCount: Int, // how often should this job be retried on failure
+                   val cronExpression: Option[String] = None, // the quartz cron expression
+                   val lockTimeout: FiniteDuration = 60 seconds // the TTL for the lock
+                   )
+
+  /**
+   * Starts a new job. The returned future should be completed once the job was started so that
+   * we know it's running, the result must be one of `Started`, `Locked` or `Error`.
+   *
+   * Once the job is finished, it must invoke `context.finished`.
+   */
+  def run()(implicit context: JobContext): Future[JobStartStatus]
+```
+
+The `JobType` identifies the job, a `JobTyp` is defined with a name and a `LockType`.
+There's a distinction between `JobType` and `LockType` so that jobs with a `JobType` sharing the same `LockType` cannot
+run simultaneously. A `LockType` is just defined with a name.
+
+### Alternative Solutions
+
+* For job locking [Zookeeper could be used](http://zookeeper.apache.org/doc/current/recipes.html#sc_recipes_Locks).
+* For job locking and job supervision [Akka's Cluster Singleton](http://doc.akka.io/docs/akka/snapshot/contrib/cluster-singleton.html) could be used.
+  There's also a nice [Activator template for distributed workers with Akka](http://typesafe.com/activator/template/akka-distributed-workers) that provides
+  an example for the cluster singleton.
+
+
+
+## Installation / Setup
+
+You must add the jsonhomeclient to the dependencies of the build file, e.g. add to `build.sbt`:
+
+    libraryDependencies += "de.kaufhof" %% "ha-jobs" % "1.0.0-RC1"
+
+It is published to maven central for both scala 2.10 and 2.11.
+
+You must create the tables `lock`, `job_status_data` and `job_status_meta` in the used Cassandra keyspace, according
+to the ([Pillar](https://github.com/comeara/pillar)) migration scripts in `src/test/resources/migrations`.
+
+## Usage
+
+For a single Job you have to
+
+* Define the `LockType` (with name)
+* Define the `JobType` (with name and `LockType`)
+* Implement your concrete job, which must extend `Job`.
+* If you're using an Akka Actor for your Job, you can use the `ActorJob` as `Job` implementation and configure it
+  with the `Props` creating your Actor (see also the example below).
+
+For the complete thing you also need
+
+* the `JobSupervisor` job, detect dead jobs and retrigger them on alive instance
+* the `JobManager`, which schedules Jobs according to their cron patterns
+
+You also need to setup/configure 2 or 3 things more, which should be self-explanatory.
+
+### Example 1: A Job with Cron Schedule, Persistence and Supervision
+
+Here's a fully working example of a job (might e.g. import products) that is started every 10 minutes.
+The job stores its status when starting/finished, it might do so as well during the import so that its progress
+could be tracked.
+In this example the JobSupervisor is also configured, so that failed/dead jobs would be detected.
+
+```scala
+import akka.actor.ActorSystem
+import de.kaufhof.hajobs.JobState._
+import de.kaufhof.hajobs._
+import de.kaufhof.hajobs.testutils.TestCassandraConnection
+import play.api.libs.json.Json
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.util.{Failure, Success, Try}
+
+// == Product Import Job
+val ProductImportLockType = LockType("ProductImportLock")
+val ProductImportJobType = JobType("ProductImport", ProductImportLockType)
+
+/**
+ * A job that normally would import products, but now only prints "importing" some times.
+ */
+class ProductImport(override val jobStatusRepository: JobStatusRepository,
+                    cronExpression: Option[String]) extends Job(
+  ProductImportJobType, retriggerCount = 3, cronExpression = cronExpression) with WriteStatus {
+
+  override def run()(implicit context: JobContext): Future[JobStartStatus] = {
+    writeStatus(Running)
+    // after updating our status we must tell the context that we're finished. This will
+    // release the lock and stop our lock keeper actor.
+    importProducts().onComplete(updateStatus.andThen(_ => context.finishCallback()))
+    Future.successful(Started(context.jobId))
+  }
+
+  // A not so long running operation, but still producing some side effect
+  private def importProducts(): Future[Int] = {
+    Future.successful {
+      println("Importing products ... done.")
+      42 // products imported
+    }
+  }
+
+  private def updateStatus(implicit context: JobContext): Try[Int] => Future[JobStatus] = {
+    case Success(count) =>
+      writeStatus(Finished, Some(Json.obj("count" -> count)))
+    case Failure(e) =>
+      writeStatus(Failed, Some(Json.obj("error" -> e.getMessage)))
+  }
+
+  override def cancel(): Unit = {
+    // We might update some flag that could be checked by `importProducts()`
+  }
+
+}
+
+// Setup repos needed for jobs + job manager
+// session: the Cassandra Session (com.datastax.driver.core.Session)
+val statusRepo = new JobStatusRepository(session, jobTypes = JobTypes(ProductImportJobType))
+val lockRepo = new LockRepository(session, LockTypes(ProductImportLockType))
+
+// Setup jobs
+val productImporter = new ProductImport(statusRepo, Some("0 * * * * ?"))
+val jobSupervisor = new JobSupervisor(manager, lockRepo, statusRepo, Some("0 * * * * ?"))
+
+// Setup the JobManager
+val manager: JobManager = new JobManager(Seq(productImporter, jobSupervisor), lockRepo, statusRepo, actorSystem)
+
+// You should `shutdown()` the manager when the application is stopped.
+```
+
+In the given example, once the `JobManager` is created, it will schedule the `productImporter` according to its `cronExpression`.
+
+Regarding the `JobTypes` and `LockTypes`: they must provide all your custom `JobType`s and `LockType`s, they're needed by
+the repositories when loading db records, which is done when job status are reported (more on this below).
+
+### Example 2: An Actor Job with Cron Schedule etc.
+
+If the previous Job would be implemented via an Actor this would be used together with the `ActorJob`.
+So the `ProductImport` class and its instance would be replaced by this
+
+```scala
+class ProductImportActor(override val jobStatusRepository: JobStatusRepository)
+                        (implicit jobContext: JobContext) extends Actor with WriteStatus {
+
+  override def jobType = ProductImportJobType
+
+  writeStatus(Running)
+
+  self ! "go"
+
+  override def receive: Receive = {
+    case "go" =>
+      println("Importing products ... done.")
+      writeStatus(Finished, Some(Json.obj("count" -> 42)))
+      // no need to tell the context that we're finished, this will be done by ActorJob when we're stopped.
+      context.stop(self)
+    case ActorJob.Cancel =>
+      // We should support ActorJob.Cancel and stop() processing.
+      writeStatus(Canceled)
+      context.stop(self)
+  }
+
+}
+
+object ProductImportActor {
+  def props(statusRepo: JobStatusRepository)(jobContext: JobContext) =
+    Props(new ProductImportActor(statusRepo)(jobContext))
+}
+
+val productImporter = new ActorJob(ProductImportJobType, ProductImportActor.props(statusRepo),
+  actorSystem, cronExpression = Some("0 * * * * ?"))
+```
+
+### Example 3: An Actor Job running continuously
+
+A use case for this might be an actor that regularly consumes a queue, with a high frequency.
+So the actor job should be started on system start, grab the lock, and run infinitely.
+
+The relevant parts from the example above would be modified like this:
+
+```scala
+class QueueConsumerActor(interval: FiniteDuration,
+                         override val jobStatusRepository: JobStatusRepository)
+                        (implicit jobContext: JobContext) extends Actor with WriteStatus {
+
+  override def jobType = ConsumerJobType
+
+  writeStatus(Running)
+
+  self ! "consume"
+
+  override def receive: Receive = consuming(0)
+
+  private def consuming(count: Int): Receive = {
+    case "consume" =>
+      println(s"Consuming, until now consumed $count items...")
+      writeStatus(Running, Some(Json.obj("round" -> count)))
+      context.system.scheduler.scheduleOnce(interval, self, "consume")
+      context.become(consuming(count + 42))
+    case ActorJob.Cancel =>
+      // We should support ActorJob.Cancel and stop() processing.
+      writeStatus(Canceled)
+      context.stop(self)
+  }
+
+}
+
+object QueueConsumerActor {
+  def props(interval: FiniteDuration, statusRepo: JobStatusRepository)(jobContext: JobContext) =
+    Props(new QueueConsumerActor(interval, statusRepo)(jobContext))
+}
+
+// The ActorJob does not define a `cronExpression`
+val queueConsumer = new ActorJob(ConsumerJobType, QueueConsumerActor.props(2 seconds, statusRepo),
+  actorSystem, cronExpression = None)
+val manager: JobManager = new JobManager(Seq(queueConsumer, jobSupervisor), lockRepo, statusRepo, system)
+
+// manually trigger the job
+manager.triggerJob(ConsumerJobType) onComplete {
+  case Success(Started(jobId, _)) => println(s"Started queue consumer job $jobId")
+  // The Success case can also carry LockedStatus or Error
+  case Success(els) => println(s"Could not start queue consumer: $els")
+  case Failure(e) => println(s"An exception occurred when trying to start queue consumer: $e")
+}
+```
+
+## License
+
+The license is Apache 2.0, see LICENSE.
