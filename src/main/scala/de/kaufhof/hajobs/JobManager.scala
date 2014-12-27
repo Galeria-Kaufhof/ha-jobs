@@ -25,7 +25,7 @@ class JobManager(managedJobs: => Jobs,
                  scheduler: Scheduler,
                  enableJobScheduling: Boolean) {
 
-  def this(jobs: Seq[Job], lockRepo: LockRepository, actorSystem: ActorSystem, sched: Scheduler, enableJobScheduling: Boolean = true) =
+  def this(jobs: Seq[Job], lockRepo: LockRepository, actorSystem: ActorSystem, sched: Scheduler = JobManager.createScheduler, enableJobScheduling: Boolean = true) =
     this(Jobs(jobs), lockRepo, actorSystem, sched, enableJobScheduling)
 
   init()
