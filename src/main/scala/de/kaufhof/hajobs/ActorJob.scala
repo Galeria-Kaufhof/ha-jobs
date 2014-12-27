@@ -3,6 +3,7 @@ package de.kaufhof.hajobs
 import akka.actor._
 
 import scala.concurrent.Future
+
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -16,11 +17,10 @@ import scala.language.postfixOps
 class ActorJob(jobType: JobType,
                props: JobContext => Props,
                system: ActorSystem,
-               jobStatusRepository: JobStatusRepository,
                retriggerCount: Int = 0,
                cronExpression: Option[String] = None,
                lockTimeout: FiniteDuration = 60 seconds)
-  extends Job(jobType, jobStatusRepository, retriggerCount, cronExpression, lockTimeout) {
+  extends Job(jobType, retriggerCount, cronExpression, lockTimeout) {
 
   private var actor: Option[ActorRef] = None
 

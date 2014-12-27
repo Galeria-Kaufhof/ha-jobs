@@ -29,7 +29,6 @@ case class JobContext(jobId: UUID, triggerId: UUID, finishCallback: () => Unit)
  * Base class for jobs, wraps job execution and status.
  */
 abstract class Job(val jobType: JobType,
-                   jobStatusRepository: JobStatusRepository,
                    val retriggerCount: Int,
                    val cronExpression: Option[String] = None,
                    val lockTimeout: FiniteDuration = 60 seconds) {
@@ -53,12 +52,4 @@ abstract class Job(val jobType: JobType,
    */
   def cancel()
 
-  def allJobStatus: Future[List[JobStatus]] = jobStatusRepository.list(jobType)
-
-  def jobStatus(jobId: UUID): Future[Option[JobStatus]] = jobStatusRepository.get(jobType, jobId)
-
-  protected def writeStatus(jobState: JobState, content: Option[JsValue] = None)(implicit jobContext: JobContext): Future[JobStatus] = {
-    val status = JobStatus(jobContext.triggerId, jobType, jobContext.jobId, jobState, JobStatus.stateToResult(jobState), DateTime.now(), content)
-    jobStatusRepository.save(status)
-  }
 }

@@ -21,12 +21,13 @@ import scala.util.control.NonFatal
  */
 class JobManager(managedJobs: => Jobs,
                  lockRepo: LockRepository,
+                 jobStatusRepo: JobStatusRepository,
                  actorSystem: ActorSystem,
                  scheduler: Scheduler,
                  enableJobScheduling: Boolean) {
 
-  def this(jobs: Seq[Job], lockRepo: LockRepository, actorSystem: ActorSystem, sched: Scheduler = JobManager.createScheduler, enableJobScheduling: Boolean = true) =
-    this(Jobs(jobs), lockRepo, actorSystem, sched, enableJobScheduling)
+  def this(jobs: Seq[Job], lockRepo: LockRepository, jobStatusRepo: JobStatusRepository, actorSystem: ActorSystem, sched: Scheduler = JobManager.createScheduler, enableJobScheduling: Boolean = true) =
+    this(Jobs(jobs), lockRepo, jobStatusRepo, actorSystem, sched, enableJobScheduling)
 
   init()
 
@@ -151,9 +152,10 @@ class JobManager(managedJobs: => Jobs,
 
   def getJob(jobType: JobType): Job = managedJobs(jobType)
 
-  def allJobStatus(jobType: JobType): Future[List[JobStatus]] = managedJobs.get(jobType).get.allJobStatus
+  def allJobStatus(jobType: JobType): Future[List[JobStatus]] = jobStatusRepo.list(jobType)
 
-  def jobStatus(jobType: JobType, jobId: UUID): Future[Option[JobStatus]] = managedJobs.get(jobType).get.jobStatus(jobId)
+  def jobStatus(jobType: JobType, jobId: UUID): Future[Option[JobStatus]] = jobStatusRepo.get(jobType, jobId)
+
 }
 
 object JobManager {

@@ -21,7 +21,7 @@ class ActorJobSpec extends StandardSpec with TestKitBase {
       val testProbe = new TestProbe(system)
       val jobType = new JobType("actorJob", new LockType("actorJobLock"))
       val props = Props(actor(testProbe.ref))
-      val job = new ActorJob(jobType, _ => props, system, mock[JobStatusRepository])
+      val job = new ActorJob(jobType, _ => props, system)
 
       var finishCalled = new AtomicBoolean(false)
       implicit val context = JobContext(randomUUID(), randomUUID(), () => finishCalled.set(true))

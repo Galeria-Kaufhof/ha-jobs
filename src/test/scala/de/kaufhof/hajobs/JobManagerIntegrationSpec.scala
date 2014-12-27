@@ -25,7 +25,7 @@ class JobManagerIntegrationSpec extends CassandraSpec with DefaultAwaitTimeout w
       val cdl = new CountDownLatch(1)
       val mockedScheduler = mock[Scheduler]
 
-      val manager = new JobManager(Seq(new Job1(jobStatusRepository, cdl), new Job12(jobStatusRepository)), lockRepository, mock[ActorSystem], mockedScheduler, false)
+      val manager = new JobManager(Seq(new Job1(jobStatusRepository, cdl), new Job12(jobStatusRepository)), lockRepository, jobStatusRepository, mock[ActorSystem], mockedScheduler, false)
       manager.triggerJob(JobType1)
 
       eventually {
@@ -39,7 +39,7 @@ class JobManagerIntegrationSpec extends CassandraSpec with DefaultAwaitTimeout w
 }
 
 object JobManagerIntegrationSpec {
-  class Job1(jobStatusRepository: JobStatusRepository, cdl: CountDownLatch) extends Job(JobType1, jobStatusRepository, 3) {
+  class Job1(jobStatusRepository: JobStatusRepository, cdl: CountDownLatch) extends Job(JobType1, 3) {
     override def run()(implicit context: JobContext): Future[JobStartStatus] = {
       import scala.concurrent.ExecutionContext.Implicits.global
       Future {
@@ -54,7 +54,7 @@ object JobManagerIntegrationSpec {
 
   object JobType12 extends JobType("testJob12", JobType1.lockType)
 
-  class Job12(jobStatusRepository: JobStatusRepository) extends Job(JobType12, jobStatusRepository, 3) {
+  class Job12(jobStatusRepository: JobStatusRepository) extends Job(JobType12, 3) {
     override def run()(implicit context: JobContext): Future[JobStartStatus] = {
       context.finishCallback()
       Future.successful(Started(context.jobId))

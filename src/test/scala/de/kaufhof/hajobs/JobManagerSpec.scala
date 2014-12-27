@@ -51,7 +51,7 @@ class JobManagerSpec extends StandardSpec {
       when(job.cronExpression).thenReturn(Some("* * * * * ?"))
 
 
-      val manager = new JobManager(Seq(job), lockRepository, actorSystem, scheduler, true)
+      val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, scheduler, true)
 
       eventually(Timeout(scaled(3 seconds))) {
         verify(job, atLeastOnce()).run()(any[JobContext])
@@ -64,7 +64,7 @@ class JobManagerSpec extends StandardSpec {
       when(job.jobType).thenReturn(JobType1)
       when(job.cronExpression).thenReturn(None)
 
-      val manager = new JobManager(Seq(job), lockRepository, actorSystem, mockedScheduler, true)
+      val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, true)
       verify(mockedScheduler, times(1)).start()
       verifyNoMoreInteractions(mockedScheduler)
     }
@@ -76,7 +76,7 @@ class JobManagerSpec extends StandardSpec {
       when(job.cronExpression).thenReturn(Some("* * * * * ?"))
 
       val jobUpdater = new JobUpdater(lockRepository, jobStatusRepository)
-      val manager = new JobManager(Seq(job), lockRepository, actorSystem, mockedScheduler, false)
+      val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, false)
       verifyNoMoreInteractions(mockedScheduler)
     }
   }
@@ -85,7 +85,7 @@ class JobManagerSpec extends StandardSpec {
     "release lock after a synchronous job finished" in {
       val job = new TestJob(jobStatusRepository)
 
-      val manager = new JobManager(Seq(job), lockRepository, actorSystem, scheduler, false)
+      val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, scheduler, false)
       await(manager.retriggerJob(JobType1, UUIDs.timeBased()))
 
       verify(lockRepository, times(1)).acquireLock(any(), any(), any())
@@ -100,7 +100,7 @@ class JobManagerSpec extends StandardSpec {
       when(job.jobType).thenReturn(JobType1)
       when(job.run()(any())).thenReturn(Future.failed(new RuntimeException("test exception")))
 
-      val manager = new JobManager(Seq(job), lockRepository, actorSystem, mockedScheduler, false)
+      val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, false)
       await(manager.retriggerJob(JobType1, UUIDs.timeBased()))
       verify(lockRepository, times(1)).acquireLock(any(), any(), any())
       verify(lockRepository, times(1)).releaseLock(any(), any())
@@ -111,8 +111,7 @@ class JobManagerSpec extends StandardSpec {
 }
 
 object JobManagerSpec {
-  class TestJob(jobStatusRepository: JobStatusRepository) extends Job(JobType1,
-    jobStatusRepository, 0) {
+  class TestJob(jobStatusRepository: JobStatusRepository) extends Job(JobType1, 0) {
     override def run()(implicit context: JobContext): Future[JobStartStatus] = {
       context.finishCallback()
       Future.successful(Started(context.jobId))

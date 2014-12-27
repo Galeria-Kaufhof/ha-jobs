@@ -22,6 +22,7 @@ abstract class JobManagerModule extends Module {
   // Non-lazy because the job manager should start cron schedules
   binding toNonLazy new JobManager(jobMap,
     inject[LockRepository],
+    inject[JobStatusRepository],
     actorSystem,
     scheduler,
     inject[Configuration].getBoolean("job.import.enableJobTriggering").getOrElse(true)

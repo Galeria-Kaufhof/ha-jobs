@@ -16,7 +16,7 @@ import scala.util.{Failure, Success}
 class JobSupervisor(jobManager: => JobManager,
                     jobUpdater: JobUpdater,
                     jobStatusRepository: JobStatusRepository,
-                    cronExpression: Option[String]) extends Job(JobTypes.JobSupervisor, jobStatusRepository, 0, cronExpression) {
+                    cronExpression: Option[String]) extends Job(JobTypes.JobSupervisor, 0, cronExpression) {
 
   def this(jobManager: => JobManager,
            lockRepository: LockRepository,
