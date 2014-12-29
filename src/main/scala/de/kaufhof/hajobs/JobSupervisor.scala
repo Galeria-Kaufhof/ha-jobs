@@ -2,7 +2,7 @@ package de.kaufhof.hajobs
 
 import java.util.UUID
 
-import play.api.Logger
+import org.slf4j.LoggerFactory._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -23,6 +23,8 @@ class JobSupervisor(jobManager: => JobManager,
            jobStatusRepository: JobStatusRepository,
            cronExpression: Option[String] = None) = this(jobManager, new JobUpdater(lockRepository, jobStatusRepository), jobStatusRepository, cronExpression)
 
+  private val logger = getLogger(getClass)
+
   @volatile
   private var isCancelled = false
 
@@ -33,32 +35,32 @@ class JobSupervisor(jobManager: => JobManager,
   def run()(implicit jobContext: JobContext): Future[JobStartStatus] = {
     isCancelled = false
     val jobId = jobContext.jobId
-    Logger.info("Starting dead job detection...")
+    logger.info("Starting dead job detection...")
 
     val updatedJobs = jobUpdater.updateJobs()
 
     updatedJobs.onComplete {
       case Success(jobs) =>
         if(jobs.isEmpty) {
-          Logger.info("Finished dead job detection, no dead jobs found.")
+          logger.info("Finished dead job detection, no dead jobs found.")
         } else {
-          Logger.info(s"Dead job detection finished, changed jobs state to DEAD for ${jobs.length} jobs.")
+          logger.info("Dead job detection finished, changed jobs state to DEAD for {} jobs.", jobs.length)
         }
       case Failure(e) =>
-        Logger.error("Error during dead job detection.", e)
+        logger.error("Error during dead job detection.", e)
     }
 
     updatedJobs.onComplete { res =>
       retriggerJobs().onComplete {
         case Success(retriggeredJobStatus) =>
           if (retriggeredJobStatus.isEmpty) {
-            Logger.info("Finished retriggering jobs, no jobs to retrigger found.")
+            logger.info("Finished retriggering jobs, no jobs to retrigger found.")
           } else {
-            Logger.info(s"Retriggering jobs finished, retriggered ${retriggeredJobStatus.length} jobs.")
+            logger.info("Retriggering jobs finished, retriggered {} jobs.", retriggeredJobStatus.length)
           }
           jobContext.finishCallback()
         case Failure(e) =>
-          Logger.error("Error during dead job detection.", e)
+          logger.error("Error during dead job detection.", e)
           jobContext.finishCallback()
       }
     }
@@ -78,7 +80,7 @@ class JobSupervisor(jobManager: => JobManager,
       jobStatusRepository.getAllMetadata().flatMap { allJobs =>
         val a = allJobs.groupBy(_.jobType).flatMap { case (jobType, jobStatus) =>
           triggerIdToRetrigger(jobType, jobStatus).map { triggerId =>
-            Logger.info(s"retriggering job of type $jobType with triggerid $triggerId")
+            logger.info(s"Retriggering job of type $jobType with triggerid $triggerId")
             jobManager.retriggerJob(jobType, triggerId)
           }
         }.toSeq

@@ -7,9 +7,7 @@ import de.kaufhof.hajobs.testutils.MockInitializers
 import org.mockito.Matchers._
 import org.mockito.Mockito._
 import org.quartz.Scheduler
-import org.scalatest.concurrent.Eventually._
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.mock.MockitoSugar.mock
 import play.api.Application
 import de.kaufhof.hajobs.testutils.StandardSpec
 
@@ -88,8 +86,8 @@ class JobManagerSpec extends StandardSpec {
       val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, scheduler, false)
       await(manager.retriggerJob(JobType1, UUIDs.timeBased()))
 
-      verify(lockRepository, times(1)).acquireLock(any(), any(), any())
-      verify(lockRepository, times(1)).releaseLock(any(), any())
+      verify(lockRepository, times(1)).acquireLock(any(), any(), any())(any())
+      verify(lockRepository, times(1)).releaseLock(any(), any())(any())
       verify(actorSystem, times(1)).actorOf(any(), any())
       verify(actorSystem, times(1)).stop(any())
     }
@@ -98,12 +96,15 @@ class JobManagerSpec extends StandardSpec {
       val mockedScheduler = mock[Scheduler]
       val job = mock[Job]
       when(job.jobType).thenReturn(JobType1)
-      when(job.run()(any())).thenReturn(Future.failed(new RuntimeException("test exception")))
+      when(job.run()(any())).thenReturn(Future.failed(new RuntimeException("test exception") {
+        // suppress the stacktrace to reduce log spam
+        override def fillInStackTrace(): Throwable = this
+      }))
 
       val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, false)
       await(manager.retriggerJob(JobType1, UUIDs.timeBased()))
-      verify(lockRepository, times(1)).acquireLock(any(), any(), any())
-      verify(lockRepository, times(1)).releaseLock(any(), any())
+      verify(lockRepository, times(1)).acquireLock(any(), any(), any())(any())
+      verify(lockRepository, times(1)).releaseLock(any(), any())(any())
       verify(actorSystem, times(1)).actorOf(any(), any())
       verify(actorSystem, times(1)).stop(any())
     }

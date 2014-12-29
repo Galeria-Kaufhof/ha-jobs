@@ -23,13 +23,10 @@ val akkaVersion = "2.3.7"
 
 libraryDependencies ++= Seq(
   "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.4",
-  // FIXME: the dependency on play should be removed
-  "com.typesafe.play" %% "play" % playVersion,
-  "com.typesafe.play" %% "play-json" % playVersion /*exclude("com.typesafe.play", "play_2.11")*/,
+  "com.typesafe.play" %% "play-json" % playVersion exclude("com.typesafe.play", "play_2.11"),
   "joda-time" % "joda-time" % "2.6",
   "org.slf4j" % "slf4j-api" % "1.7.9",
   "org.quartz-scheduler" % "quartz" % "2.2.1",
-  "org.scaldi" %% "scaldi" % "0.4" % "optional",
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
   "org.scalatest" %% "scalatest" % "2.2.0" % "test",

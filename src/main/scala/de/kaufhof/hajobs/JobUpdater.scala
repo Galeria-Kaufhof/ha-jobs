@@ -1,6 +1,6 @@
 package de.kaufhof.hajobs
 
-import play.api.Logger
+import org.slf4j.LoggerFactory.getLogger
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -12,6 +12,8 @@ import scala.concurrent.Future
  * @param jobStatusRepository find all the jobStatus
  */
 class JobUpdater(lockRepository: LockRepository, jobStatusRepository: JobStatusRepository) {
+
+  private val logger = getLogger(getClass)
 
   def updateJobs(): Future[List[JobStatus]] = {
 
@@ -38,7 +40,7 @@ class JobUpdater(lockRepository: LockRepository, jobStatusRepository: JobStatusR
     if (deadJobs.isEmpty) {
       Future.successful(List.empty)
     } else {
-      Logger.info(s"Detected dead jobs, changing state to DEAD for: ${deadJobs.map(_.jobId).mkString(",")}")
+      logger.info("Detected dead jobs, changing state to DEAD for: {}", deadJobs.map(_.jobId).mkString(","))
       val updateResults = deadJobs.map(job =>
         jobStatusRepository.updateJobState(job, JobState.Dead)
       )

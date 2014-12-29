@@ -22,9 +22,9 @@ object MockInitializers {
 
   def initializeLockRepo(lockRepo: LockRepository): LockRepository = {
     Mockito.reset(lockRepo)
-    when(lockRepo.acquireLock(any[JobType], any[UUID], any[Duration])).thenReturn(Future.successful(true))
-    when(lockRepo.updateLock(any[JobType], any[UUID], any[Duration])).thenReturn(Future.successful(true))
-    when(lockRepo.getIdForType(any[JobType])).thenReturn(Future.successful(Some(UUIDs.timeBased())))
+    when(lockRepo.acquireLock(any[JobType], any[UUID], any[Duration])(any())).thenReturn(Future.successful(true))
+    when(lockRepo.updateLock(any[JobType], any[UUID], any[Duration])(any())).thenReturn(Future.successful(true))
+    when(lockRepo.getIdForType(any[JobType])(any())).thenReturn(Future.successful(Some(UUIDs.timeBased())))
     lockRepo
   }
 
@@ -42,15 +42,15 @@ object MockInitializers {
         tempJobStatus = args(0).asInstanceOf[JobStatus]
         Future.successful(tempJobStatus)
       }
-    }).when(jobStatusRepo).save(any())
+    }).when(jobStatusRepo).save(any())(any())
 
-    when(jobStatusRepo.updateJobState(any(), any())).thenAnswer(futureIdentityAnswer())
+    when(jobStatusRepo.updateJobState(any(), any())(any())).thenAnswer(futureIdentityAnswer())
 
-    when(jobStatusRepo.list(any[JobType], anyInt(), anyBoolean())).thenAnswer(new Answer[Future[List[JobStatus]]] {
+    when(jobStatusRepo.list(any[JobType], anyInt(), anyBoolean())(any())).thenAnswer(new Answer[Future[List[JobStatus]]] {
 
       override def answer(invocation: InvocationOnMock) = Future.successful(if (tempJobStatus == null) Nil else List(tempJobStatus))
     })
-    when(jobStatusRepo.get(any[JobType], any(), anyBoolean())).thenAnswer(new Answer[Future[Option[JobStatus]]] {
+    when(jobStatusRepo.get(any[JobType], any(), anyBoolean())(any())).thenAnswer(new Answer[Future[Option[JobStatus]]] {
       override def answer(invocation: InvocationOnMock) = Future.successful(Option(tempJobStatus))
     })
 

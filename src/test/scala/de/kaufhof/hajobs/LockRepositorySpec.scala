@@ -6,6 +6,7 @@ import com.datastax.driver.core.utils.UUIDs
 import de.kaufhof.hajobs.testutils.CassandraSpec
 import org.joda.time.DateTime
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 

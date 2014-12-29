@@ -15,6 +15,8 @@ object Ex2ScheduledActorJob extends App with TestCassandraConnection {
   class ProductImportActor(override val jobStatusRepository: JobStatusRepository)
                           (implicit jobContext: JobContext) extends Actor with WriteStatus {
 
+    import context.dispatcher // implicit EC, for writeStatus
+
     override def jobType = ProductImportJobType
 
     writeStatus(Running)

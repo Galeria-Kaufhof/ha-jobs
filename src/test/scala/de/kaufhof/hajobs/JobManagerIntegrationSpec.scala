@@ -8,6 +8,7 @@ import org.quartz.Scheduler
 import org.scalatest.mock.MockitoSugar
 import play.api.test._
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.language.postfixOps
 
@@ -41,7 +42,6 @@ class JobManagerIntegrationSpec extends CassandraSpec with DefaultAwaitTimeout w
 object JobManagerIntegrationSpec {
   class Job1(jobStatusRepository: JobStatusRepository, cdl: CountDownLatch) extends Job(JobType1, 3) {
     override def run()(implicit context: JobContext): Future[JobStartStatus] = {
-      import scala.concurrent.ExecutionContext.Implicits.global
       Future {
         cdl.await()
         context.finishCallback()

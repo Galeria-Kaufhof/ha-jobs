@@ -8,10 +8,9 @@ import CassandraUtils._
 import com.datastax.driver.core._
 import com.datastax.driver.core.querybuilder.QueryBuilder._
 import com.datastax.driver.core.querybuilder.{Insert, QueryBuilder}
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
 
 import scala.collection.JavaConversions._
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Try
@@ -97,13 +96,15 @@ class LockRepository(session: Session, lockTypes: LockTypes) {
    * the PAXOS consensus protocol. see http://www.datastax.com/documentation/cassandra/2.0/cassandra/dml/dml_ltwt_transaction_c.html
    * for more info
    */
-  def updateLock(jobType: JobType, jobId: UUID, ttl: Duration = 60 seconds): Future[Boolean] =
+  def updateLock(jobType: JobType, jobId: UUID, ttl: Duration = 60 seconds)
+                (implicit ec: ExecutionContext): Future[Boolean] =
     session.executeAsync(updateLockStatement(jobType.lockType, jobId, ttl)).map { resultSet =>
       resultSet.one.getBool(0)
       // 0 == applied col; get column by name is not available as it is not defined in the schema
     }
 
-  def acquireLock(jobType: JobType, jobId: UUID, ttl: Duration = 60 seconds): Future[Boolean] = {
+  def acquireLock(jobType: JobType, jobId: UUID, ttl: Duration = 60 seconds)
+                 (implicit ec: ExecutionContext): Future[Boolean] = {
     for {
       insert <- save(jobType)
       resultSet <- session.executeAsync(getLockStatement(jobType.lockType, jobId, ttl))
@@ -112,7 +113,7 @@ class LockRepository(session: Session, lockTypes: LockTypes) {
     }
   }
 
-  def releaseLock(jobType: JobType, jobId: UUID): Future[Boolean] =
+  def releaseLock(jobType: JobType, jobId: UUID)(implicit ec: ExecutionContext): Future[Boolean] =
     session.executeAsync(unlockStatement(jobType.lockType, jobId)).map { resultSet =>
       resultSet.one.getBool(0)
       // 0 == applied col; get column by name is not available as it is not defined in the schema
@@ -121,7 +122,7 @@ class LockRepository(session: Session, lockTypes: LockTypes) {
   /**
    * @param jobType the job type of the job, e.g. "product_full_import"
    */
-  def getIdForType(jobType: JobType): Future[Option[UUID]] = {
+  def getIdForType(jobType: JobType)(implicit ec: ExecutionContext): Future[Option[UUID]] = {
     val query = select().all().from(Table).where(QueryBuilder.eq(LockTypeCol, jobType.lockType.name)).setConsistencyLevel(LOCAL_QUORUM)
     session.executeAsync(query).map(rs => Option(rs.one)).map(_.map(rowToJobId))
   }
@@ -129,7 +130,7 @@ class LockRepository(session: Session, lockTypes: LockTypes) {
   /**
    * Returns a list of Locks (jobType + jobId).
    */
-  def getAll(): Future[Seq[Lock]] = {
+  def getAll()(implicit ec: ExecutionContext): Future[Seq[Lock]] = {
     val query = select().all().from(Table).setConsistencyLevel(LOCAL_QUORUM)
     session.executeAsync(query).map(rs =>
       rs.all().foldLeft(Seq.empty[Lock]) { (res, row) =>

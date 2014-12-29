@@ -7,7 +7,7 @@ import com.datastax.driver.core.utils.UUIDs
 import org.quartz._
 import org.quartz.impl.DirectSchedulerFactory
 import org.quartz.simpl.{RAMJobStore, SimpleThreadPool}
-import play.api.Logger
+import org.slf4j.LoggerFactory.getLogger
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -29,20 +29,22 @@ class JobManager(managedJobs: => Jobs,
   def this(jobs: Seq[Job], lockRepo: LockRepository, jobStatusRepo: JobStatusRepository, actorSystem: ActorSystem, sched: Scheduler = JobManager.createScheduler, enableJobScheduling: Boolean = true) =
     this(Jobs(jobs), lockRepo, jobStatusRepo, actorSystem, sched, enableJobScheduling)
 
+  private val logger = getLogger(getClass)
+
   init()
 
   protected def init(): Unit = {
     if (enableJobScheduling) {
-      Logger.debug("JobManager: Starting scheduler")
+      logger.debug("JobManager: Starting scheduler")
       scheduler.start
       scheduleJobs
     } else {
-      Logger.warn("CRON JOBS ARE GLOBALLY DISABLED via config, will not schedule jobs!")
+      logger.warn("CRON JOBS ARE GLOBALLY DISABLED via config, will not schedule jobs!")
     }
   }
 
   def shutdown(): Unit = {
-    Logger.debug("JobManager: Shutting down scheduler")
+    logger.debug("JobManager: Shutting down scheduler")
     scheduler.shutdown(false)
     managedJobs.keys.foreach(cancelJob)
   }
@@ -51,7 +53,7 @@ class JobManager(managedJobs: => Jobs,
     val jobType = jobToSchedule.jobType
     try {
       jobToSchedule.cronExpression.map { cronExpression =>
-        Logger.debug(s"scheduling job for $jobType")
+        logger.debug("scheduling job for {}", jobType)
         val job = JobBuilder
           .newJob(classOf[TriggerPuller])
           .usingJobData(TPData(jobType, this).asDataMap)
@@ -70,13 +72,13 @@ class JobManager(managedJobs: => Jobs,
 
         scheduler.scheduleJob(job, trigger)
 
-        Logger.info(s"job '$jobType' has cron expression '${trigger.getCronExpression}', first execution at ${trigger.getNextFireTime}")
+        logger.info("Job '{}' has cron expression '{}', first execution at {}", jobType, trigger.getCronExpression, trigger.getNextFireTime)
       }.getOrElse(
-          Logger.info(s"no cronExpression defined for job $jobType")
+          logger.info("No cronExpression defined for job {}", jobType)
         )
     } catch {
       case NonFatal(e) =>
-        Logger.error(s"could not start scheduler for job type=$jobType", e)
+        logger.error(s"Could not start scheduler for job type $jobType", e)
         throw e
     }
   }
@@ -92,7 +94,7 @@ class JobManager(managedJobs: => Jobs,
    */
   def triggerJob(jobType: JobType): Future[JobStartStatus] = {
     val triggerId = UUIDs.timeBased()
-    Logger.info(s"triggering job of type $jobType with triggerid $triggerId")
+    logger.info(s"Triggering job of type $jobType with triggerid $triggerId")
     retriggerJob(jobType, triggerId)
   }
 
@@ -114,7 +116,7 @@ class JobManager(managedJobs: => Jobs,
       if (haveLock) {
         val lockKeeper = actorSystem.actorOf(KeepJobLockedActor.props(lockRepo, jobType, jobId, job.lockTimeout, job.cancel _), jobType.name + "_LOCK")
         def finishCallback(): Unit = {
-          Logger.info(s"Job with type $jobType and id $jobId finished, cleaning up...")
+          logger.info(s"Job with type $jobType and id $jobId finished, cleaning up...")
           lockRepo.releaseLock(jobType, jobId)
           actorSystem.stop(lockKeeper)
         }
@@ -124,7 +126,7 @@ class JobManager(managedJobs: => Jobs,
         // before starting new Job, update old pending jobs to status dead
         job.run().map {
           case res@Started(jobId, _) =>
-            Logger.info(s"Job with type $jobType and id $jobId successfully started")
+            logger.info(s"Job with type $jobType and id $jobId successfully started")
             res
 
           case res@default =>
@@ -132,7 +134,7 @@ class JobManager(managedJobs: => Jobs,
             res
         }.recover {
           case NonFatal(e) =>
-            Logger.error(s"error starting job with type $jobType and id $jobId")
+            logger.error(s"Error starting job with type $jobType and id $jobId", e)
             finishCallback()
             Error(e.getMessage)
         }
@@ -146,7 +148,7 @@ class JobManager(managedJobs: => Jobs,
   }
 
   def cancelJob(jobType: JobType): Unit = {
-    Logger.info(s"cancelling job for job type $jobType")
+    logger.info("Cancelling job for job type {}", jobType)
     managedJobs(jobType).cancel
   }
 
@@ -159,8 +161,11 @@ class JobManager(managedJobs: => Jobs,
 }
 
 object JobManager {
+
+  private val logger = getLogger(classOf[JobManager])
+
   def createScheduler: Scheduler = {
-    Logger.info("creating quartz scheduler")
+    logger.info("Creating quartz scheduler")
 
     // ensure scheduler is only registered once
     if (!Option(DirectSchedulerFactory.getInstance.getScheduler("JobManagerScheduler")).isDefined) {
@@ -178,10 +183,12 @@ object JobManager {
 
 private[hajobs] class TriggerPuller extends org.quartz.Job {
 
+  private val logger = getLogger(getClass)
+
   override def execute(context: JobExecutionContext): Unit = {
     val data = TPData(context.getJobDetail.getJobDataMap)
 
-    Logger.info(s"It's ${context.getFireTime}, triggering job '${data.jobType}' next call at ${context.getNextFireTime}")
+    logger.info("It's {}, triggering job '{}' next call at {}", context.getFireTime, data.jobType, context.getNextFireTime)
 
     data.manager.triggerJob(data.jobType)
   }

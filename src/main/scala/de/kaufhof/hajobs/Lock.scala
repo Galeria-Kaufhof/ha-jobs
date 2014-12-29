@@ -2,8 +2,6 @@ package de.kaufhof.hajobs
 
 import java.util.{NoSuchElementException, UUID}
 
-import play.api.Logger
-
 /**
  * A Lock exists for jobType and jobId.
  */

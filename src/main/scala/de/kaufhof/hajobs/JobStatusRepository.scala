@@ -10,11 +10,11 @@ import CassandraUtils._
 import com.datastax.driver.core._
 import de.kaufhof.hajobs.JobState._
 import org.joda.time.DateTime
-import play.api.Logger
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
+import org.slf4j.LoggerFactory.getLogger
+
 import play.api.libs.json.{JsValue, Json}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
@@ -28,7 +28,7 @@ class JobStatusRepository(session: Session,
                           ttl: FiniteDuration = 14.days,
                           jobTypes: JobTypes) {
 
-  private val logger = Logger(getClass)
+  private val logger = getLogger(getClass)
 
   private val MetaTable = "job_status_meta"
   private val DataTable = "job_status_data"
@@ -68,19 +68,19 @@ class JobStatusRepository(session: Session,
     stmt
   }
 
-  def save(jobStatus: JobStatus): Future[JobStatus] = {
+  def save(jobStatus: JobStatus)(implicit ec: ExecutionContext): Future[JobStatus] = {
     val batchStmt = batch(insertMetaQuery(jobStatus), insertDataQuery(jobStatus))
     session.executeAsync(batchStmt).map(_ => jobStatus)
   }
 
-  def updateJobState(jobStatus: JobStatus, newState: JobState): Future[JobStatus] = {
+  def updateJobState(jobStatus: JobStatus, newState: JobState)(implicit ec: ExecutionContext): Future[JobStatus] = {
     save(jobStatus.copy(jobState = newState, jobResult = JobStatus.stateToResult(newState), jobStatusTs = DateTime.now()))
   }
 
   /**
    * Finds the latest job status entries for all jobs.
    */
-  def getAllMetadata(readWithQuorum: Boolean = false): Future[List[JobStatus]] = {
+  def getAllMetadata(readWithQuorum: Boolean = false)(implicit ec: ExecutionContext): Future[List[JobStatus]] = {
     import scala.collection.JavaConversions._
 
     val selectStmt = select().all().from(MetaTable)
@@ -101,7 +101,8 @@ class JobStatusRepository(session: Session,
    * Returns the history of saved JobStatus for a single job (each save/update for a job
    * is a separate entry).
    */
-  def getJobHistory(jobType: JobType, jobId: UUID, withQuorum: Boolean = false): Future[List[JobStatus]] = {
+  def getJobHistory(jobType: JobType, jobId: UUID, withQuorum: Boolean = false)
+                   (implicit ec: ExecutionContext): Future[List[JobStatus]] = {
     import scala.collection.JavaConversions._
 
     val selectStmt = select().all()
@@ -120,7 +121,8 @@ class JobStatusRepository(session: Session,
       ))
   }
 
-  def list(jobType: JobType, limit: Int = 20, withQuorum: Boolean = false): Future[List[JobStatus]] = {
+  def list(jobType: JobType, limit: Int = 20, withQuorum: Boolean = false)
+          (implicit ec: ExecutionContext): Future[List[JobStatus]] = {
     import scala.collection.JavaConversions._
     val selectStmt = select().all()
       .from(MetaTable)
@@ -138,7 +140,8 @@ class JobStatusRepository(session: Session,
       ))
   }
 
-  def get(jobType: JobType, jobId: UUID, withQuorum: Boolean = false): Future[Option[JobStatus]] = {
+  def get(jobType: JobType, jobId: UUID, withQuorum: Boolean = false)
+         (implicit ec: ExecutionContext): Future[Option[JobStatus]] = {
     val selectStmt = select().all()
       .from(DataTable)
       .where(QueryBuilder.eq(JobTypeColumn, jobType.name))
@@ -174,7 +177,7 @@ class JobStatusRepository(session: Session,
       ))
     } catch {
       case NonFatal(e) =>
-        Logger.error("error mapping a JobStatus datarow to JobStatus object", e)
+        logger.error("error mapping a JobStatus datarow to JobStatus object", e)
         None
     }
   }
@@ -191,7 +194,7 @@ class JobStatusRepository(session: Session,
     )
   }
 
-  def clear(): Future[Unit] = {
+  def clear()(implicit ec: ExecutionContext): Future[Unit] = {
     val metaResFuture = session.executeAsync(truncate(MetaTable))
     val dataResFuture = session.executeAsync(truncate(DataTable))
     for(
