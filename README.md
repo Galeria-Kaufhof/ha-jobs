@@ -5,6 +5,23 @@
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
+## Contents
+
+- [Overview](#overview)
+ - [Features](#features)
+ - [Constraints](#constraints)
+ - [Implementation/Solution Details](#implementationsolution-details)
+ - [Alternative Solutions](#alternative-solutions)
+- [Installation / Setup](#installation--setup)
+- [Usage](#usage)
+ - [Example 1: A Job with Cron Schedule, Persistence and Supervision](#example-1-a-job-with-cron-schedule-persistence-and-supervision)
+ - [Example 2: An Actor Job with Cron Schedule etc.](#example-2-an-actor-job-with-cron-schedule-etc)
+ - [Example 3: An Actor Job running continuously](#example-3-an-actor-job-running-continuously)
+ - [Play! REST API](#play-rest-api)
+- [License](#license)
+
+## Overview
+
 ### Features:
 
 * Job Locking
