@@ -3,7 +3,6 @@ import net.virtualvoid.sbt.graph.Plugin.graphSettings
 val projectVersion = "1.0.0-RC1"
 
 val projectSettings = Seq(
-  name := "ha-jobs",
   description := "Run distributed, highly available (batch) jobs, with job locking and supervision.",
   organization := "de.kaufhof",
   version := projectVersion,
@@ -46,10 +45,13 @@ val publishSettings = Seq(
 )
 
 val playVersion = "2.3.7"
-
 val akkaVersion = "2.3.7"
+val scalatest = "org.scalatest" %% "scalatest" % "2.2.0" % "test"
+val mockito = "org.mockito" % "mockito-core" % "1.9.5" % "test"
+val playTest = "com.typesafe.play" %% "play-test" % "2.3.0" % "test"
 
 lazy val core = project.in(file("ha-jobs-core"))
+  .settings(name := "ha-jobs")
   .settings(projectSettings: _*)
   .settings(buildSettings: _*)
   .settings(publishSettings: _*)
@@ -64,11 +66,32 @@ lazy val core = project.in(file("ha-jobs-core"))
       "org.quartz-scheduler" % "quartz" % "2.2.1",
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
-      "org.scalatest" %% "scalatest" % "2.2.0" % "test",
-      "org.mockito" % "mockito-core" % "1.9.5" % "test",
-      "com.typesafe.play" %% "play-test" % "2.3.0" % "test",
+      playTest,
+      scalatest,
+      mockito,
       "com.chrisomeara" %% "pillar" % "2.0.1" % "test"
     )
   )
 
-lazy val main = project.in(file(".")).aggregate(core)
+lazy val play = project.in(file("ha-jobs-play"))
+  .dependsOn(core)
+  .settings(
+    name := "ha-jobs-play",
+    description := "Adds a Play controller that allows to manage jobs."
+  )
+  .settings(projectSettings: _*)
+  .settings(buildSettings: _*)
+  .settings(publishSettings: _*)
+  .settings(graphSettings: _*)
+  .settings(
+    resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
+    libraryDependencies ++= Seq(
+      "com.typesafe.play" %% "play" % playVersion,
+      "com.typesafe.play" %% "play-json" % playVersion,
+      playTest,
+      scalatest,
+      mockito
+    )
+  )
+
+lazy val main = project.in(file(".")).aggregate(core, play)

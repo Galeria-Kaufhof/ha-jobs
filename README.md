@@ -73,7 +73,7 @@ run simultaneously. A `LockType` is just defined with a name.
 
 ## Installation / Setup
 
-You must add the jsonhomeclient to the dependencies of the build file, e.g. add to `build.sbt`:
+You must add the ha-jobs to the dependencies of the build file, e.g. add to `build.sbt`:
 
     libraryDependencies += "de.kaufhof" %% "ha-jobs" % "1.0.0-RC1"
 
@@ -267,6 +267,40 @@ manager.triggerJob(ConsumerJobType) onComplete {
   case Failure(e) => println(s"An exception occurred when trying to start queue consumer: $e")
 }
 ```
+
+### Play! REST API
+
+The module `ha-jobs-play` provides a Play! controller that allows to start jobs and retrieve the job status via HTTP.
+
+To use this you must add the following to the build file:
+
+    libraryDependencies += "de.kaufhof" %% "ha-jobs-play" % "1.0.0-RC1"
+
+In your routes file you have to add these routes (of course you may choose different urls):
+
+    POST   /jobs/:jobType           @de.kaufhof.hajobs.JobsController.importTrigger(jobType)
+    GET    /jobs/:jobType           @de.kaufhof.hajobs.JobsController.importList(jobType)
+    GET    /jobs/:jobType/latest    @de.kaufhof.hajobs.JobsController.importCheck(jobType)
+    GET    /jobs/:jobType/:jobId    @de.kaufhof.hajobs.JobsController.importStatus(jobType, jobId)
+
+Use your preferred dependency injection mechanism to provide the managed `JobsController` to your `GlobalSettings`:
+
+```scala
+val jobManager = ... // the JobManager
+val jobTypes = ... // e.g. JobTypes(ProductImportJobType) in the 1st example
+new JobsController(jobManager, jobTypes, de.kaufhof.hajobs.routes.JobsController)
+```
+
+The `de.kaufhof.hajobs.routes.JobsController` is the reverse router (`ReverseJobsController`) created by Play!
+on compilation.
+
+Then you can manage your jobs via http, e.g. get all executions for a job of `JobType("productimport")` via
+
+    curl http://localhost:9000/jobs/productimport
+
+or start a new product import via
+
+    curl -X POST http://localhost:9000/jobs/productimport
 
 ## License
 
