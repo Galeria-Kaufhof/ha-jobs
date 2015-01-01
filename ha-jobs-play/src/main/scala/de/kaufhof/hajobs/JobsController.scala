@@ -17,16 +17,20 @@ class JobsController(jobManager: JobManager,
                      jobTypes: JobTypes,
                      // We don't have a reverse router yet, this needs to be supplied by the app
                      reverseRouter: {
-                       def importStatus(jobType: String, importId: String): Call
+                       def status(jobType: String, jobId: String): Call
                      }) extends Controller {
 
   private val logger = Logger(getClass)
 
   private def statusUrl(jobType: JobType, jobId: UUID): String = {
-    reverseRouter.importStatus(jobType.name, jobId.toString).url
+    reverseRouter.status(jobType.name, jobId.toString).url
   }
 
-  def importCheck(jobTypeString: String): Action[AnyContent] = Action.async {
+  /**
+   * Determines the latest job execution and redirects (temporarily, 307) to its status details url.
+   * If no job executions are found 404 is returned.
+   */
+  def latest(jobTypeString: String): Action[AnyContent] = Action.async {
     stringToJobType(jobTypeString).map { jobType =>
       val jobStatusFuture: Future[List[JobStatus]] = jobManager.allJobStatus(jobType)
       jobStatusFuture.map(_.headOption).map {
@@ -37,8 +41,11 @@ class JobsController(jobManager: JobManager,
     }.getOrElse(Future.successful(NotFound))
   }
 
-  def importStatus(jobTypeString: String, importIdAsString: String): Action[AnyContent] = Action.async {
-    Try(UUID.fromString(importIdAsString)).map { uuid =>
+  /**
+   * Returns the status details for the given job type and job id.
+   */
+  def status(jobTypeString: String, jobIdAsString: String): Action[AnyContent] = Action.async {
+    Try(UUID.fromString(jobIdAsString)).map { uuid =>
       stringToJobType(jobTypeString).map { jobType =>
         val jobStatusFuture: Future[Option[JobStatus]] = jobManager.jobStatus(jobType, uuid)
         jobStatusFuture.map {
@@ -49,7 +56,10 @@ class JobsController(jobManager: JobManager,
     }.getOrElse(Future.successful(NotFound))
   }
 
-  def importList(jobTypeString: String): Action[AnyContent] = Action.async {
+  /**
+   * Returns the list of job executions for the given job type.
+   */
+  def list(jobTypeString: String): Action[AnyContent] = Action.async {
     stringToJobType(jobTypeString).map { jobType =>
       val jobStatusFuture: Future[List[JobStatus]] = jobManager.allJobStatus(jobType)
       jobStatusFuture.map { jobs =>
@@ -58,7 +68,10 @@ class JobsController(jobManager: JobManager,
     }.getOrElse(Future.successful(NotFound))
   }
 
-  def importTrigger(jobTypeString: String): Action[AnyContent] = Action.async { implicit request =>
+  /**
+   * Starts the execution of the given job type.
+   */
+  def run(jobTypeString: String): Action[AnyContent] = Action.async { implicit request =>
     stringToJobType(jobTypeString).map { jobType =>
       jobManager.triggerJob(jobType).map {
         case Started(newJobId, None) =>
@@ -70,7 +83,7 @@ class JobsController(jobManager: JobManager,
             .withHeaders(("Location", statusUrl(jobType, newJobId)))
 
         case LockedStatus(runningJobId) =>
-          val conflict = Conflict(Json.obj("status" -> "KO", "message" -> s"There's already an import running"))
+          val conflict = Conflict(Json.obj("status" -> "KO", "message" -> s"The job's already running"))
           runningJobId.map(id =>
             conflict.withHeaders(("Location", statusUrl(jobType, id)))
           ).getOrElse(
@@ -82,8 +95,8 @@ class JobsController(jobManager: JobManager,
 
       }.recover {
         case NonFatal(e) =>
-          logger.error("error when starting importer", e)
-          InternalServerError(s"error when starting importer: $e")
+          logger.error("Error when starting job", e)
+          InternalServerError(s"Error when starting job: $e")
       }
     }.getOrElse(Future.successful(NotFound))
   }

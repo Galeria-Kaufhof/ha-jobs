@@ -295,10 +295,10 @@ To use this you must add the following to the build file:
 
 In your routes file you have to add these routes (of course you may choose different urls):
 
-    POST   /jobs/:jobType           @de.kaufhof.hajobs.JobsController.importTrigger(jobType)
-    GET    /jobs/:jobType           @de.kaufhof.hajobs.JobsController.importList(jobType)
-    GET    /jobs/:jobType/latest    @de.kaufhof.hajobs.JobsController.importCheck(jobType)
-    GET    /jobs/:jobType/:jobId    @de.kaufhof.hajobs.JobsController.importStatus(jobType, jobId)
+    POST   /jobs/:jobType           @de.kaufhof.hajobs.JobsController.run(jobType)
+    GET    /jobs/:jobType           @de.kaufhof.hajobs.JobsController.list(jobType)
+    GET    /jobs/:jobType/latest    @de.kaufhof.hajobs.JobsController.latest(jobType)
+    GET    /jobs/:jobType/:jobId    @de.kaufhof.hajobs.JobsController.status(jobType, jobId)
 
 Use your preferred dependency injection mechanism to provide the managed `JobsController` to your `GlobalSettings`:
 
@@ -311,12 +311,15 @@ new JobsController(jobManager, jobTypes, de.kaufhof.hajobs.routes.JobsController
 The `de.kaufhof.hajobs.routes.JobsController` is the reverse router (`ReverseJobsController`) created by Play!
 on compilation.
 
-Then you can manage your jobs via http, e.g. get all executions for a job of `JobType("productimport")` via
+Then you can manage your jobs via http, e.g. using the following for a job of `JobType("productimport")`:
 
+    # get a list of all job executions
     curl http://localhost:9000/jobs/productimport
-
-or start a new product import via
-
+    # get redirected to the status of the latest job execution
+    curl -L http://localhost:9000/jobs/productimport/latest
+    # get job execution status/details
+    curl http://localhost:9000/jobs/productimport/a13037f0-9076-11e4-a8d6-4ff0e8bdfb24
+    # execute the job
     curl -X POST http://localhost:9000/jobs/productimport
 
 ## License

@@ -28,18 +28,18 @@ class JobsControllerSpec extends WordSpec with BeforeAndAfterEach with Matchers 
     when(jobManager.triggerJob(jobType1)).thenReturn(Future.successful(Started(randomUUID())))
   }
 
-  private def importStatusUrl(jobType: String, jobId: String): String = s"/$jobType/imports/$jobId"
+  private def statusUrl(jobType: String, jobId: String): String = s"/$jobType/imports/$jobId"
 
   // We don't have working reverse routes, therefore we're unit testing the controller...
   private val controller = new JobsController(jobManager, JobTypes(jobType1), new {
-    def importStatus(jobType: String, jobId: String) = Call("GET", importStatusUrl(jobType, jobId))
+    def status(jobType: String, jobId: String) = Call("GET", statusUrl(jobType, jobId))
   })
 
   private def run(action: Action[AnyContent]): Future[Result] = action.apply(FakeRequest())
 
-  "JobsController" should {
-    "start a job when triggerImport is Called" in {
-      val result = run(controller.importTrigger(jobType1.name))
+  "JobsController.run" should {
+    "start a job" in {
+      val result = run(controller.run(jobType1.name))
 
       status(result) should be(CREATED)
       verify(jobManager, times(1)).triggerJob(jobType1)
@@ -49,12 +49,14 @@ class JobsControllerSpec extends WordSpec with BeforeAndAfterEach with Matchers 
       val someId = randomUUID()
       when(jobManager.triggerJob(jobType1)).thenReturn(Future.successful(LockedStatus(Some(someId))))
 
-      val result = run(controller.importTrigger(jobType1.name))
+      val result = run(controller.run(jobType1.name))
       status(result) should be(CONFLICT)
-      header("Location", result) should be (Some(importStatusUrl(jobType1.name, someId.toString)))
+      header("Location", result) should be(Some(statusUrl(jobType1.name, someId.toString)))
     }
+  }
 
-    "return import Location when asked without importId while running" in {
+  "JobsController.latest" should {
+    "return job status Location" in {
       val someId = randomUUID()
       when(jobManager.allJobStatus(jobType1)).thenReturn(Future.successful(List(JobStatus(randomUUID(),
         jobType1,
@@ -64,22 +66,24 @@ class JobsControllerSpec extends WordSpec with BeforeAndAfterEach with Matchers 
         DateTime.now()
       ))))
 
-      val result = run(controller.importCheck(jobType1.name))
+      val result = run(controller.latest(jobType1.name))
       status(result) should be(TEMPORARY_REDIRECT)
-      header("Location", result) should be(Some(importStatusUrl(jobType1.name, someId.toString)))
+      header("Location", result) should be(Some(statusUrl(jobType1.name, someId.toString)))
     }
 
-    "return 404 if a not exisiting job is referenced in url" in {
-      val result = run(controller.importCheck("notExisting"))
+    "return 404 if a not exisiting job type is referenced in url" in {
+      val result = run(controller.latest("notExisting"))
       status(result) should be(NOT_FOUND)
     }
 
-    "return 404 when idle" in {
-      val result = run(controller.importCheck(jobType1.name))
+    "return 404 when there are no job executions" in {
+      val result = run(controller.latest(jobType1.name))
       status(result) should be(NOT_FOUND)
       contentAsString(result) should be(empty)
     }
+  }
 
+  "JobsController.status" should {
     "return 200 plus details when running" in {
       val someId = randomUUID()
       when(jobManager.jobStatus(jobType1, someId)).thenReturn(Future.successful(Some(JobStatus(randomUUID(),
@@ -90,7 +94,7 @@ class JobsControllerSpec extends WordSpec with BeforeAndAfterEach with Matchers 
         DateTime.now()
       ))))
 
-      val result = run(controller.importStatus(jobType1.name, someId.toString))
+      val result = run(controller.status(jobType1.name, someId.toString))
       status(result) should be(OK)
       contentType(result) should be(Some(MimeTypes.JSON))
 
