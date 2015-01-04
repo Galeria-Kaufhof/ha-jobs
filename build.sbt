@@ -60,7 +60,7 @@ lazy val core = project.in(file("ha-jobs-core"))
     resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
     libraryDependencies ++= Seq(
       "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.4",
-      "com.typesafe.play" %% "play-json" % playVersion exclude("com.typesafe.play", "play_2.11"),
+      "com.typesafe.play" %% "play-json" % playVersion exclude("com.typesafe.play", "play_" + scalaVersion.value.substring(0, 4)),
       "joda-time" % "joda-time" % "2.6",
       "org.slf4j" % "slf4j-api" % "1.7.9",
       "org.quartz-scheduler" % "quartz" % "2.2.1",
