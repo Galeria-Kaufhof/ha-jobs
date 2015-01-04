@@ -60,24 +60,28 @@ A job must extend `Job`, which has the following interface:
 
 ```scala
 abstract class Job(val jobType: JobType,
-                   jobStatusRepository: JobStatusRepository,
-                   val retriggerCount: Int, // how often should this job be retried on failure
-                   val cronExpression: Option[String] = None, // the quartz cron expression
-                   val lockTimeout: FiniteDuration = 60 seconds // the TTL for the lock
-                   )
+                   val retriggerCount: Int,
+                   val cronExpression: Option[String] = None,
+                   val lockTimeout: FiniteDuration = 60 seconds) {
 
   /**
-   * Starts a new job. The returned future should be completed once the job was started so that
-   * we know it's running, the result must be one of `Started`, `Locked` or `Error`.
+   * Starts a new job and returns a [[de.kaufhof.hajobs.JobExecution JobExecution]].
+   * The [[de.kaufhof.hajobs.JobExecution#result JobExecution.result]] future must be
+   * completed when the job execution is finished.
    *
-   * Once the job is finished, it must invoke `context.finished`.
+   * This method (`run`) should not "block", all the work must be performed
+   * by the returned `JobExecution`.
    */
-  def run()(implicit context: JobContext): Future[JobStartStatus]
+  def run()(implicit context: JobContext): JobExecution
+
+}
 ```
 
 The `JobType` identifies the job, a `JobTyp` is defined with a name and a `LockType`.
 There's a distinction between `JobType` and `LockType` so that jobs with a `JobType` sharing the same `LockType` cannot
 run simultaneously. A `LockType` is just defined with a name.
+
+If your job is implemented as an actor, you can just use the `ActorJob`, as shown by examples below.
 
 ### Alternative Solutions
 
@@ -85,8 +89,6 @@ run simultaneously. A `LockType` is just defined with a name.
 * For job locking and job supervision [Akka's Cluster Singleton](http://doc.akka.io/docs/akka/snapshot/contrib/cluster-singleton.html) could be used.
   There's also a nice [Activator template for distributed workers with Akka](http://typesafe.com/activator/template/akka-distributed-workers) that provides
   an example for the cluster singleton.
-
-
 
 ## Installation / Setup
 
@@ -97,7 +99,8 @@ You must add the ha-jobs to the dependencies of the build file, e.g. add to `bui
 It is published to maven central for both scala 2.10 and 2.11.
 
 You must create the tables `lock`, `job_status_data` and `job_status_meta` in the used Cassandra keyspace, according
-to the ([Pillar](https://github.com/comeara/pillar)) migration scripts in `src/test/resources/migrations`.
+to the ([Pillar](https://github.com/comeara/pillar)) migration scripts in
+[ha-jobs-core/src/test/resources/migrations](https://github.com/Galeria-Kaufhof/ha-jobs/tree/master/ha-jobs-core/src/test/resources/migrations).
 
 ## Usage
 
@@ -106,12 +109,12 @@ For a single Job you have to
 * Define the `LockType` (with name)
 * Define the `JobType` (with name and `LockType`)
 * Implement your concrete job, which must extend `Job`.
-* If you're using an Akka Actor for your Job, you can use the `ActorJob` as `Job` implementation and configure it
+* If you're using an Akka Actor for your Job, you can just use the `ActorJob` as `Job` implementation and configure it
   with the `Props` creating your Actor (see also the example below).
 
-For the complete thing you also need
+To complete the setup you also need
 
-* the `JobSupervisor` job, detect dead jobs and retrigger them on alive instance
+* the `JobSupervisor` job, which detects dead jobs and retriggers them on an alive instance
 * the `JobManager`, which schedules Jobs according to their cron patterns
 
 You also need to setup/configure 2 or 3 things more, which should be self-explanatory.
@@ -298,6 +301,7 @@ To use this you must add the following to the build file:
 
 In your routes file you have to add these routes (of course you may choose different urls):
 
+
     POST   /jobs/:jobType           @de.kaufhof.hajobs.JobsController.run(jobType)
     GET    /jobs/:jobType           @de.kaufhof.hajobs.JobsController.list(jobType)
     GET    /jobs/:jobType/latest    @de.kaufhof.hajobs.JobsController.latest(jobType)
@@ -316,14 +320,16 @@ on compilation.
 
 Then you can manage your jobs via http, e.g. using the following for a job of `JobType("productimport")`:
 
-    # get a list of all job executions
-    curl http://localhost:9000/jobs/productimport
-    # get redirected to the status of the latest job execution
-    curl -L http://localhost:9000/jobs/productimport/latest
-    # get job execution status/details
-    curl http://localhost:9000/jobs/productimport/a13037f0-9076-11e4-a8d6-4ff0e8bdfb24
-    # execute the job
-    curl -X POST http://localhost:9000/jobs/productimport
+```bash
+# get a list of all job executions
+curl http://localhost:9000/jobs/productimport
+# get redirected to the status of the latest job execution
+curl -L http://localhost:9000/jobs/productimport/latest
+# get job execution status/details
+curl http://localhost:9000/jobs/productimport/a13037f0-9076-11e4-a8d6-4ff0e8bdfb24
+# execute the job
+curl -X POST http://localhost:9000/jobs/productimport
+```
 
 ## License
 

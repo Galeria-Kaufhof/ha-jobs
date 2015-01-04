@@ -29,7 +29,8 @@ case class JobContext(jobType: JobType, jobId: UUID, triggerId: UUID)
 
 
 /**
- * Base class for jobs, wraps job execution and status.
+ * Base class for jobs, job execution is started via `run()`.
+ * For actor jobs you can just use the `ActorJob`.
  */
 abstract class Job(val jobType: JobType,
                    val retriggerCount: Int,
