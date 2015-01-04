@@ -7,7 +7,7 @@ val projectSettings = Seq(
   organization := "de.kaufhof",
   version := projectVersion,
   licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html")),
-  homepage := Some(url("https://github.com/Galeria-Kaufhof/cassandra-jobs"))
+  homepage := Some(url("https://github.com/Galeria-Kaufhof/ha-jobs"))
 )
 
 val buildSettings = Seq(
@@ -31,8 +31,8 @@ val publishSettings = Seq(
   pomIncludeRepository := { _ => false },
   pomExtra := (
     <scm>
-      <url>git@github.com:Galeria-Kaufhof/cassandra-jobs.git</url>
-      <connection>scm:git:git@github.com:Galeria-Kaufhof/cassandra-jobs.git</connection>
+      <url>git@github.com:Galeria-Kaufhof/ha-jobs.git</url>
+      <connection>scm:git:git@github.com:Galeria-Kaufhof/ha-jobs.git</connection>
     </scm>
     <developers>
       <developer>
