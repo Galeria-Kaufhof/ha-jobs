@@ -17,8 +17,6 @@ object Ex2ScheduledActorJob extends App with TestCassandraConnection {
 
     import context.dispatcher // implicit EC, for writeStatus
 
-    override def jobType = ProductImportJobType
-
     writeStatus(Running)
 
     self ! "go"
@@ -38,7 +36,8 @@ object Ex2ScheduledActorJob extends App with TestCassandraConnection {
   }
 
   object ProductImportActor {
-    def props(statusRepo: JobStatusRepository)(jobContext: JobContext) = Props(new ProductImportActor(statusRepo)(jobContext))
+    def props(statusRepo: JobStatusRepository)(jobContext: JobContext) =
+      Props(new ProductImportActor(statusRepo)(jobContext))
   }
 
   // Setup jobs + job manager

@@ -9,6 +9,7 @@ import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import play.api.libs.json.{JsValue, _}
 
+import scala.language.implicitConversions
 import scala.util.Try
 import scala.util.control.NonFatal
 

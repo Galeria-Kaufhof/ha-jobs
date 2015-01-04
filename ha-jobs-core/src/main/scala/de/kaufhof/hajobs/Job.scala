@@ -22,7 +22,10 @@ case class LockedStatus(runningId: Option[UUID] = None) extends JobStartStatus
 
 case class Error(details: String) extends JobStartStatus
 
-case class JobContext(jobId: UUID, triggerId: UUID, finishCallback: () => Unit)
+/**
+ * Details regarding a job execution.
+ */
+case class JobContext(jobType: JobType, jobId: UUID, triggerId: UUID)
 
 
 /**
@@ -34,22 +37,32 @@ abstract class Job(val jobType: JobType,
                    val lockTimeout: FiniteDuration = 60 seconds) {
 
   /**
-   * Starts a new job. The returned future should be completed once the job was started so that
-   * we know it's running.
+   * Starts a new job and returns a [[de.kaufhof.hajobs.JobExecution JobExecution]].
+   * The [[de.kaufhof.hajobs.JobExecution#result JobExecution.result]] future must be
+   * completed when the job execution is finished.
    *
-   * This method should only be called by job manager. That one is responsibly for lock management and
-   * creation of JobContext.
-   *
-   * ATTENTION: For job manager to work probably it needs to be informed when job execution finished. For that
-   * a method finishCallback is provided in JobContext. That needs to be called when job execution is finished.
-   * Otherwise the job will fall in undefined state.
+   * This method (`run`) should not "block", all the work must be performed
+   * by the returned `JobExecution`.
    */
-  def run()(implicit context: JobContext): Future[JobStartStatus]
+  def run()(implicit context: JobContext): JobExecution
+
+}
+
+/**
+ * The actual execution of a certain Job.
+ * @param context the job context, is made implicitely available to the JobExecution
+ *                (e.g. useful in combination with WriteStatus).
+ */
+abstract class JobExecution(implicit val context: JobContext) {
 
   /**
-   * Cancels a running job, jobs need to check the [isCancelled] property accordingly.
-   * For now, there is no return value provided to identify if cancelation was successful.
+   * The result of this job execution. Once completed, the lock will be released.
    */
-  def cancel()
+  def result: Future[Unit]
+
+  /**
+   * Cancels this job execution. Cancellation must complete the [[result]] Future at some point.
+   */
+  def cancel(): Unit
 
 }

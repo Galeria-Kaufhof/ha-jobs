@@ -7,7 +7,7 @@ import de.kaufhof.hajobs.testutils.TestCassandraConnection
 import play.api.libs.json.Json
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Promise, Future}
 import scala.util.{Failure, Success, Try}
 
 object Ex1ScheduledJob extends App with TestCassandraConnection {
@@ -21,33 +21,38 @@ object Ex1ScheduledJob extends App with TestCassandraConnection {
    */
   class ProductImport(override val jobStatusRepository: JobStatusRepository,
                       cronExpression: Option[String]) extends Job(
-    ProductImportJobType, retriggerCount = 0, cronExpression = cronExpression) with WriteStatus {
+    ProductImportJobType, retriggerCount = 3, cronExpression = cronExpression) with WriteStatus {
 
-    override def run()(implicit context: JobContext): Future[JobStartStatus] = {
-      writeStatus(Running)
-      // after updating our status we must tell the context that we're finished. This will
-      // release the lock and stop our lock keeper actor.
-      importProducts().onComplete(updateStatus.andThen(_ => context.finishCallback()))
-      Future.successful(Started(context.jobId))
-    }
+    override def run()(implicit context: JobContext): JobExecution = new JobExecution() {
 
-    // A not so long running operation, but still producing some side effect
-    private def importProducts(): Future[Int] = {
-      Future.successful {
-        println("Importing products ... done.")
-        42 // products imported
+      private val promise = Promise[Unit]()
+      override val result = promise.future
+
+      override def cancel(): Unit = {
+        // We might update some flag that could be checked by `importProducts()`
       }
-    }
 
-    private def updateStatus(implicit context: JobContext): Try[Int] => Future[JobStatus] = {
-      case Success(count) =>
-        writeStatus(Finished, Some(Json.obj("count" -> count)))
-      case Failure(e) =>
-        writeStatus(Failed, Some(Json.obj("error" -> e.getMessage)))
-    }
+      writeStatus(Running)
 
-    override def cancel(): Unit = {
-      // We might update some flag that could be checked by `importProducts()`
+      // onComplete: after updating our status we must complete the result. This will
+      // release the lock and stop the lock keeper actor.
+      importProducts().onComplete(updateStatus.andThen(_ => promise.success(())))
+
+      // A not so long running operation, but still producing some side effect
+      private def importProducts(): Future[Int] = {
+        Future.successful {
+          println("Importing products ... done.")
+          42 // products imported
+        }
+      }
+
+      private def updateStatus(implicit context: JobContext): Try[Int] => Future[JobStatus] = {
+        case Success(count) =>
+          writeStatus(Finished, Some(Json.obj("count" -> count)))
+        case Failure(e) =>
+          writeStatus(Failed, Some(Json.obj("error" -> e.getMessage)))
+      }
+
     }
 
   }
@@ -61,7 +66,7 @@ object Ex1ScheduledJob extends App with TestCassandraConnection {
   val productImporter = new ProductImport(statusRepo, Some("0/10 * * * * ?"))
   val jobSupervisor = new JobSupervisor(manager, lockRepo, statusRepo, Some("0 * * * * ?"))
 
-  val system = ActorSystem("system")
+  val system = ActorSystem("example1")
 
   // Setup the JobManager
   val manager: JobManager = new JobManager(Seq(productImporter, jobSupervisor), lockRepo, statusRepo, system)

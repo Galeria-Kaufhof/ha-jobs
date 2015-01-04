@@ -21,20 +21,18 @@ object Ex3InfinitActorJob extends App with TestCassandraConnection {
                            override val jobStatusRepository: JobStatusRepository)
                           (implicit jobContext: JobContext) extends Actor with WriteStatus {
 
-    override def jobType = ConsumerJobType
-
     writeStatus(Running)
 
     self ! "consume"
     
     override def receive: Receive = consuming(0)
 
-    private def consuming(count: Int): Receive = {
+    private def consuming(consumed: Int): Receive = {
       case "consume" =>
-        println(s"Consuming, until now consumed $count items...")
-        writeStatus(Running, Some(Json.obj("round" -> count)))
+        println(s"Consuming, until now consumed $consumed items...")
+        writeStatus(Running, Some(Json.obj("consumed" -> consumed)))
         context.system.scheduler.scheduleOnce(interval, self, "consume")
-        context.become(consuming(count + 42))
+        context.become(consuming(consumed + 42))
       case ActorJob.Cancel =>
         // We should support ActorJob.Cancel and stop() processing.
         writeStatus(Canceled)

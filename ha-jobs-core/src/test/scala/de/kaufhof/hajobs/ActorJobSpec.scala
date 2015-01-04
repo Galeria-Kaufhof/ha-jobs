@@ -1,11 +1,12 @@
 package de.kaufhof.hajobs
 
 import java.util.UUID._
-import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor._
 import akka.testkit.{TestKit, TestKitBase, TestProbe}
 import de.kaufhof.hajobs.testutils.StandardSpec
+
+import scala.util.Success
 
 class ActorJobSpec extends StandardSpec with TestKitBase {
 
@@ -17,17 +18,16 @@ class ActorJobSpec extends StandardSpec with TestKitBase {
 
   "ActorJob" should {
 
-    def test(actor: ActorRef => Actor)(check: (Job, TestProbe, AtomicBoolean) => Unit) = {
+    def test(actor: ActorRef => Actor)(check: (TestProbe, JobExecution) => Unit) = {
       val testProbe = new TestProbe(system)
       val jobType = new JobType("actorJob", new LockType("actorJobLock"))
       val props = Props(actor(testProbe.ref))
       val job = new ActorJob(jobType, _ => props, system)
 
-      var finishCalled = new AtomicBoolean(false)
-      implicit val context = JobContext(randomUUID(), randomUUID(), () => finishCalled.set(true))
-      job.run()
+      implicit val context = JobContext(jobType, randomUUID(), randomUUID())
+      val jobExecution = job.run()
 
-      check(job, testProbe, finishCalled)
+      check(testProbe, jobExecution)
     }
 
     "run actor from props" in {
@@ -39,17 +39,17 @@ class ActorJobSpec extends StandardSpec with TestKitBase {
         }
       }
 
-      test(testProbe => new MyActor(testProbe)) { (_, testProbe, finishCalled) =>
+      test(testProbe => new MyActor(testProbe)) { (testProbe, jobExecution) =>
         testProbe.expectMsg("run")
         testProbe.reply("ACK")
         eventually {
-          finishCalled.get() shouldBe true
+          jobExecution.result.value shouldBe Some(Success(()))
         }
       }
 
     }
 
-    "cancel actor on cancel()" in {
+    "cancel actor on cancel() and complete the result" in {
 
       class MyActor(receiver: ActorRef) extends Actor {
         receiver ! "run"
@@ -58,11 +58,11 @@ class ActorJobSpec extends StandardSpec with TestKitBase {
         }
       }
 
-      test(testProbe => new MyActor(testProbe)) { (job, testProbe, finishCalled) =>
+      test(testProbe => new MyActor(testProbe)) { (testProbe, jobExecution) =>
         testProbe.expectMsg("run")
-        job.cancel()
+        jobExecution.cancel()
         eventually {
-          finishCalled.get() shouldBe true
+          jobExecution.result.value shouldBe Some(Success(()))
         }
       }
 

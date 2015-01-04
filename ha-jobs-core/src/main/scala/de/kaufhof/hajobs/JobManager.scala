@@ -2,7 +2,9 @@ package de.kaufhof.hajobs
 
 import java.util.{TimeZone, UUID}
 
+import akka.pattern.ask
 import akka.actor.ActorSystem
+import akka.util.Timeout
 import com.datastax.driver.core.utils.UUIDs
 import org.quartz._
 import org.quartz.impl.DirectSchedulerFactory
@@ -12,7 +14,9 @@ import org.slf4j.LoggerFactory.getLogger
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
+import scala.language.postfixOps
 
 /**
  * A JobManager is responsible for running jobs. It creates the infrastructure, checks locking  etc. for job running
@@ -31,6 +35,8 @@ class JobManager(managedJobs: => Jobs,
 
   private val logger = getLogger(getClass)
 
+  private val executor = actorSystem.actorOf(JobExecutor.props(lockRepo), "JobExecutor")
+
   init()
 
   protected def init(): Unit = {
@@ -44,9 +50,10 @@ class JobManager(managedJobs: => Jobs,
   }
 
   def shutdown(): Unit = {
-    logger.debug("JobManager: Shutting down scheduler")
+    logger.info("JobManager shutdown(): stopping scheduler and canceling running jobs.")
     scheduler.shutdown(false)
     managedJobs.keys.foreach(cancelJob)
+    actorSystem.stop(executor)
   }
 
   protected def scheduleJob(jobToSchedule: Job) = {
@@ -110,46 +117,14 @@ class JobManager(managedJobs: => Jobs,
    * @return StartStatus, f.e. Started if job could be started or LockedStatus if job is already running.
    */
   def retriggerJob(jobType: JobType, triggerId: UUID): Future[JobStartStatus] = {
-    val jobId = UUIDs.timeBased()
     val job = managedJobs(jobType)
-    lockRepo.acquireLock(jobType, jobId, job.lockTimeout).flatMap { haveLock =>
-      if (haveLock) {
-        val lockKeeper = actorSystem.actorOf(KeepJobLockedActor.props(lockRepo, jobType, jobId, job.lockTimeout, job.cancel _), jobType.name + "_LOCK")
-        def finishCallback(): Unit = {
-          logger.info(s"Job with type $jobType and id $jobId finished, cleaning up...")
-          lockRepo.releaseLock(jobType, jobId)
-          actorSystem.stop(lockKeeper)
-        }
-
-        implicit val context = JobContext(jobId, triggerId, finishCallback _)
-
-        // before starting new Job, update old pending jobs to status dead
-        job.run().map {
-          case res@Started(jobId, _) =>
-            logger.info(s"Job with type $jobType and id $jobId successfully started")
-            res
-
-          case res@default =>
-            finishCallback()
-            res
-        }.recover {
-          case NonFatal(e) =>
-            logger.error(s"Error starting job with type $jobType and id $jobId", e)
-            finishCallback()
-            Error(e.getMessage)
-        }
-      } else {
-        lockRepo.getIdForType(jobType).map { uuid =>
-          val id = uuid.map(id => Some(id)).getOrElse(None)
-          LockedStatus(id)
-        }
-      }
-    }
+    implicit val timeout = Timeout(5 seconds)
+    (executor ? JobExecutor.Execute(job, triggerId)).mapTo[JobStartStatus]
   }
 
   def cancelJob(jobType: JobType): Unit = {
     logger.info("Cancelling job for job type {}", jobType)
-    managedJobs(jobType).cancel
+    executor ! JobExecutor.Cancel(jobType)
   }
 
   def getJob(jobType: JobType): Job = managedJobs(jobType)

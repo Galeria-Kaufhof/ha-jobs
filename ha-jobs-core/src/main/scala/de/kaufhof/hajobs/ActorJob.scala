@@ -2,7 +2,7 @@ package de.kaufhof.hajobs
 
 import akka.actor._
 
-import scala.concurrent.Future
+import scala.concurrent.{Promise, Future}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -22,27 +22,26 @@ class ActorJob(jobType: JobType,
                lockTimeout: FiniteDuration = 60 seconds)
   extends Job(jobType, retriggerCount, cronExpression, lockTimeout) {
 
-  private var actor: Option[ActorRef] = None
+  override def run()(implicit ctxt: JobContext): JobExecution = new JobExecution() {
 
-  override def run()(implicit ctxt: JobContext): Future[JobStartStatus] = {
+    private val actor = system.actorOf(props(ctxt), s"${jobType.name}-${ctxt.jobId}")
+    private val promise = Promise[Unit]()
+    override val result: Future[Unit] = promise.future
 
-    actor = Some(system.actorOf(props(ctxt), "myActorJob"))
-
-    val watcher = system.actorOf(Props(new Actor {
-      context.watch(actor.get)
+    private val watcher = system.actorOf(Props(new Actor {
+      context.watch(actor)
       override def receive: Actor.Receive = {
         case Terminated(actorRef) =>
           context.unwatch(actorRef)
-          ctxt.finishCallback()
-          actor = None
+          promise.success(())
           context.stop(self)
       }
     }), "ActorJobWatcher")
 
-    Future.successful(Started(ctxt.jobId))
+    override def cancel(): Unit = actor ! ActorJob.Cancel
+
   }
 
-  override def cancel(): Unit = actor.foreach(_ ! ActorJob.Cancel)
 }
 
 object ActorJob {

@@ -5,7 +5,7 @@ import java.util.UUID
 import org.slf4j.LoggerFactory._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Promise, Future}
 import scala.util.{Failure, Success}
 
 /**
@@ -25,19 +25,22 @@ class JobSupervisor(jobManager: => JobManager,
 
   private val logger = getLogger(getClass)
 
-  @volatile
-  private var isCancelled = false
-
   /**
    * Starts dead job detection. The start status is returned as soon as we know if we have
    * the lock or not (actual job detection is running in the background after that).
    */
-  def run()(implicit jobContext: JobContext): Future[JobStartStatus] = {
-    isCancelled = false
-    val jobId = jobContext.jobId
+  def run()(implicit jobContext: JobContext): JobExecution = new JobExecution() {
+
+    @volatile
+    private var isCancelled = false
+
+    private val jobId = jobContext.jobId
     logger.info("Starting dead job detection...")
 
-    val updatedJobs = jobUpdater.updateJobs()
+    private val promise = Promise[Unit]()
+    override val result: Future[Unit] = promise.future
+
+    private val updatedJobs = jobUpdater.updateJobs()
 
     updatedJobs.onComplete {
       case Success(jobs) =>
@@ -51,24 +54,27 @@ class JobSupervisor(jobManager: => JobManager,
     }
 
     updatedJobs.onComplete { res =>
-      retriggerJobs().onComplete {
-        case Success(retriggeredJobStatus) =>
-          if (retriggeredJobStatus.isEmpty) {
-            logger.info("Finished retriggering jobs, no jobs to retrigger found.")
-          } else {
-            logger.info("Retriggering jobs finished, retriggered {} jobs.", retriggeredJobStatus.length)
-          }
-          jobContext.finishCallback()
-        case Failure(e) =>
-          logger.error("Error during dead job detection.", e)
-          jobContext.finishCallback()
+      if (!isCancelled) {
+        retriggerJobs().onComplete {
+          case Success(retriggeredJobStatus) =>
+            if (retriggeredJobStatus.isEmpty) {
+              logger.info("Finished retriggering jobs, no jobs to retrigger found.")
+            } else {
+              logger.info("Retriggering jobs finished, retriggered {} jobs.", retriggeredJobStatus.length)
+            }
+            promise.success(())
+          case Failure(e) =>
+            logger.error("Error during dead job detection.", e)
+            promise.failure(e)
+        }
+      } else {
+        Future.successful(Nil)
       }
     }
 
-    Future.successful(Started(jobId))
+    override def cancel(): Unit = isCancelled = true
   }
 
-  override def cancel(): Unit = isCancelled = true
 
   /**
    * Retrigger all failed jobs. A job is considered failed if for the latest trigger id there is no succeded job
@@ -76,18 +82,14 @@ class JobSupervisor(jobManager: => JobManager,
    * @return
    */
   private[hajobs] def retriggerJobs(): Future[Seq[JobStartStatus]] = {
-    if (!isCancelled) {
-      jobStatusRepository.getAllMetadata().flatMap { allJobs =>
-        val a = allJobs.groupBy(_.jobType).flatMap { case (jobType, jobStatus) =>
-          triggerIdToRetrigger(jobType, jobStatus).map { triggerId =>
-            logger.info(s"Retriggering job of type $jobType with triggerid $triggerId")
-            jobManager.retriggerJob(jobType, triggerId)
-          }
-        }.toSeq
-        Future.sequence(a)
-      }
-    } else {
-      Future.successful(Nil)
+    jobStatusRepository.getAllMetadata().flatMap { allJobs =>
+      val a = allJobs.groupBy(_.jobType).flatMap { case (jobType, jobStatus) =>
+        triggerIdToRetrigger(jobType, jobStatus).map { triggerId =>
+          logger.info(s"Retriggering job of type $jobType with triggerid $triggerId")
+          jobManager.retriggerJob(jobType, triggerId)
+        }
+      }.toSeq
+      Future.sequence(a)
     }
   }
 

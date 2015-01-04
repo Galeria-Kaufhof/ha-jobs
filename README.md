@@ -127,11 +127,10 @@ In this example the JobSupervisor is also configured, so that failed/dead jobs w
 import akka.actor.ActorSystem
 import de.kaufhof.hajobs.JobState._
 import de.kaufhof.hajobs._
-import de.kaufhof.hajobs.testutils.TestCassandraConnection
 import play.api.libs.json.Json
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Promise, Future}
 import scala.util.{Failure, Success, Try}
 
 // == Product Import Job
@@ -145,31 +144,36 @@ class ProductImport(override val jobStatusRepository: JobStatusRepository,
                     cronExpression: Option[String]) extends Job(
   ProductImportJobType, retriggerCount = 3, cronExpression = cronExpression) with WriteStatus {
 
-  override def run()(implicit context: JobContext): Future[JobStartStatus] = {
-    writeStatus(Running)
-    // after updating our status we must tell the context that we're finished. This will
-    // release the lock and stop our lock keeper actor.
-    importProducts().onComplete(updateStatus.andThen(_ => context.finishCallback()))
-    Future.successful(Started(context.jobId))
-  }
+  override def run()(implicit context: JobContext): JobExecution = new JobExecution() {
 
-  // A not so long running operation, but still producing some side effect
-  private def importProducts(): Future[Int] = {
-    Future.successful {
-      println("Importing products ... done.")
-      42 // products imported
+    private val promise = Promise[Unit]()
+    override val result = promise.future
+
+    override def cancel(): Unit = {
+      // We might update some flag that could be checked by `importProducts()`
     }
-  }
 
-  private def updateStatus(implicit context: JobContext): Try[Int] => Future[JobStatus] = {
-    case Success(count) =>
-      writeStatus(Finished, Some(Json.obj("count" -> count)))
-    case Failure(e) =>
-      writeStatus(Failed, Some(Json.obj("error" -> e.getMessage)))
-  }
+    writeStatus(Running)
 
-  override def cancel(): Unit = {
-    // We might update some flag that could be checked by `importProducts()`
+    // onComplete: after updating our status we must complete the result. This will
+    // release the lock and stop the lock keeper actor.
+    importProducts().onComplete(updateStatus.andThen(_ => promise.success(())))
+
+    // A not so long running operation, but still producing some side effect
+    private def importProducts(): Future[Int] = {
+      Future.successful {
+        println("Importing products ... done.")
+        42 // products imported
+      }
+    }
+
+    private def updateStatus(implicit context: JobContext): Try[Int] => Future[JobStatus] = {
+      case Success(count) =>
+        writeStatus(Finished, Some(Json.obj("count" -> count)))
+      case Failure(e) =>
+        writeStatus(Failed, Some(Json.obj("error" -> e.getMessage)))
+    }
+
   }
 
 }
@@ -180,19 +184,21 @@ val statusRepo = new JobStatusRepository(session, jobTypes = JobTypes(ProductImp
 val lockRepo = new LockRepository(session, LockTypes(ProductImportLockType))
 
 // Setup jobs
-val productImporter = new ProductImport(statusRepo, Some("0 * * * * ?"))
+val productImporter = new ProductImport(statusRepo, Some("0 0 * * * ?"))
 val jobSupervisor = new JobSupervisor(manager, lockRepo, statusRepo, Some("0 * * * * ?"))
 
+val system = ActorSystem("example1")
+
 // Setup the JobManager
-val manager: JobManager = new JobManager(Seq(productImporter, jobSupervisor), lockRepo, statusRepo, actorSystem)
+val manager: JobManager = new JobManager(Seq(productImporter, jobSupervisor), lockRepo, statusRepo, system)
 
 // You should `shutdown()` the manager when the application is stopped.
 ```
 
 In the given example, once the `JobManager` is created, it will schedule the `productImporter` according to its `cronExpression`.
 
-Regarding the `JobTypes` and `LockTypes`: they must provide all your custom `JobType`s and `LockType`s, they're needed by
-the repositories when loading db records, which is done when job status are reported (more on this below).
+The `JobTypes` and `LockTypes` must provide all your custom `JobType`s and `LockType`s, they're needed by
+the repositories when loading db records, which is done when a job status is reported (e.g. via the Play! REST API).
 
 ### Example 2: An Actor Job with Cron Schedule etc.
 
@@ -202,8 +208,6 @@ So the `ProductImport` class and its instance would be replaced by this
 ```scala
 class ProductImportActor(override val jobStatusRepository: JobStatusRepository)
                         (implicit jobContext: JobContext) extends Actor with WriteStatus {
-
-  override def jobType = ProductImportJobType
 
   writeStatus(Running)
 
@@ -228,8 +232,9 @@ object ProductImportActor {
     Props(new ProductImportActor(statusRepo)(jobContext))
 }
 
+// the `ActorJob` creates a new actor from the given Props on each schedule
 val productImporter = new ActorJob(ProductImportJobType, ProductImportActor.props(statusRepo),
-  actorSystem, cronExpression = Some("0 * * * * ?"))
+  system, cronExpression = Some("0 0 * * * ?"))
 ```
 
 ### Example 3: An Actor Job running continuously
@@ -244,20 +249,18 @@ class QueueConsumerActor(interval: FiniteDuration,
                          override val jobStatusRepository: JobStatusRepository)
                         (implicit jobContext: JobContext) extends Actor with WriteStatus {
 
-  override def jobType = ConsumerJobType
-
   writeStatus(Running)
 
   self ! "consume"
 
   override def receive: Receive = consuming(0)
 
-  private def consuming(count: Int): Receive = {
+  private def consuming(consumed: Int): Receive = {
     case "consume" =>
-      println(s"Consuming, until now consumed $count items...")
-      writeStatus(Running, Some(Json.obj("round" -> count)))
+      println(s"Consuming, until now consumed $consumed items...")
+      writeStatus(Running, Some(Json.obj("consumed" -> consumed)))
       context.system.scheduler.scheduleOnce(interval, self, "consume")
-      context.become(consuming(count + 42))
+      context.become(consuming(consumed + 42))
     case ActorJob.Cancel =>
       // We should support ActorJob.Cancel and stop() processing.
       writeStatus(Canceled)
@@ -271,9 +274,9 @@ object QueueConsumerActor {
     Props(new QueueConsumerActor(interval, statusRepo)(jobContext))
 }
 
-// The ActorJob does not define a `cronExpression`
+// the ActorJob does not define a `cronExpression`
 val queueConsumer = new ActorJob(ConsumerJobType, QueueConsumerActor.props(2 seconds, statusRepo),
-  actorSystem, cronExpression = None)
+  system, cronExpression = None)
 val manager: JobManager = new JobManager(Seq(queueConsumer, jobSupervisor), lockRepo, statusRepo, system)
 
 // manually trigger the job
