@@ -77,9 +77,9 @@ abstract class Job(val jobType: JobType,
 }
 ```
 
-The `JobType` identifies the job, a `JobTyp` is defined with a name and a `LockType`.
-There's a distinction between `JobType` and `LockType` so that jobs with a `JobType` sharing the same `LockType` cannot
-run simultaneously. A `LockType` is just defined with a name.
+The `JobType` identifies the job, it is defined with a name and a `LockType`.
+There's a distinction between `JobType` and `LockType` so that jobs with the same `LockType` cannot
+run simultaneously. A `LockType` is just defined by name.
 
 If your job is implemented as an actor, you can just use the `ActorJob`, as shown by examples below.
 
