@@ -24,7 +24,8 @@ class ActorJob(jobType: JobType,
 
   override def run()(implicit ctxt: JobContext): JobExecution = new JobExecution() {
 
-    private val actor = system.actorOf(props(ctxt), s"${jobType.name}-${ctxt.jobId}")
+    private val actorName = s"${jobType.name}-${ctxt.jobId}"
+    private val actor = system.actorOf(props(ctxt), actorName)
     private val promise = Promise[Unit]()
     override val result: Future[Unit] = promise.future
 
@@ -36,7 +37,7 @@ class ActorJob(jobType: JobType,
           promise.success(())
           context.stop(self)
       }
-    }), "ActorJobWatcher")
+    }), s"${actorName}_watcher")
 
     override def cancel(): Unit = actor ! ActorJob.Cancel
 
