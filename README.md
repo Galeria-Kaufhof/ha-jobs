@@ -89,6 +89,7 @@ If your job is implemented as an actor, you can just use the `ActorJob`, as show
 * For job locking and job supervision [Akka's Cluster Singleton](http://doc.akka.io/docs/akka/snapshot/contrib/cluster-singleton.html) could be used.
   There's also a nice [Activator template for distributed workers with Akka](http://typesafe.com/activator/template/akka-distributed-workers) that provides
   an example for the cluster singleton.
+* [Chronos](https://github.com/airbnb/chronos) Fault tolerant job scheduler for Mesos which handles dependencies and ISO8601 based schedules. _Batteries included_
 
 ## Installation / Setup
 
