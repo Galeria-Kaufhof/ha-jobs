@@ -2,7 +2,7 @@ package de.kaufhof.hajobs
 
 import java.util.UUID
 
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor.{Cancellable, Actor, ActorLogging, Props}
 import org.joda.time.{DateTime, Seconds}
 
 import scala.concurrent.duration._
@@ -20,9 +20,14 @@ class KeepJobLockedActor(lockRepository: LockRepository, jobType: JobType, jobId
   import KeepJobLockedActor._
 
   log.info("Started KeepJobLockedActor, jobType: {}, jobId: {}", jobType, jobId)
-  private var schedule = system.scheduler.scheduleOnce(0 millis, self, Tick)
+  @volatile
+  private var schedule = scheduleTick()
   private var lastSuccess: DateTime = DateTime.now()
   private var isCanceled = false
+
+  private def scheduleTick(): Cancellable = {
+    system.scheduler.scheduleOnce(lockTtl / 2, self, Tick)
+  }
 
   def receive: Receive = {
     case Cancel =>
@@ -41,7 +46,7 @@ class KeepJobLockedActor(lockRepository: LockRepository, jobType: JobType, jobId
             lastSuccess = DateTime.now
             // calling system throws NPE when Actor is shut down
             // dont know how to decide if system is callable
-            Try(schedule = system.scheduler.scheduleOnce(lockTtl / 2, self, Tick))
+            Try(schedule = scheduleTick())
           }
         }.recover {
           case NonFatal(e) =>
