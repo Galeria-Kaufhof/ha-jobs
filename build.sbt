@@ -1,6 +1,6 @@
 import net.virtualvoid.sbt.graph.Plugin.graphSettings
 
-val projectVersion = "1.0.0-RC2-SNAPSHOT"
+val projectVersion = "1.0.0-RC2"
 
 val projectSettings = Seq(
   description := "Run distributed, highly available (batch) jobs, with job locking and supervision.",
