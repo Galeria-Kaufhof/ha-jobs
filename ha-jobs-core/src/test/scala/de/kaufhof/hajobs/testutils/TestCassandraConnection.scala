@@ -13,7 +13,7 @@ object TestCassandraConnection {
   private var sessionCache: Option[Session] = None
 
   private def createSessionAndInitKeyspace(uri: CassandraConnectionUri, isDev: Boolean,
-                                           defaultConsistencyLevel: ConsistencyLevel = ConsistencyLevel.QUORUM):
+                                           defaultConsistencyLevel: ConsistencyLevel = ConsistencyLevel.LOCAL_QUORUM):
   Session = sessionCache.synchronized {
     sessionCache.getOrElse {
       Logger.info(s"Connecting cassandra on ${uri.hosts.mkString("(", ",", ")")}:$uri.port (keyspace ${uri.keyspace})")
@@ -47,7 +47,7 @@ object TestCassandraConnection {
   }
 
   private val cassandraUrl = CassandraConnectionUri(config.getString("cassandra.url"))
-  lazy val Session = createSessionAndInitKeyspace(cassandraUrl, true, ConsistencyLevel.QUORUM)
+  lazy val Session = createSessionAndInitKeyspace(cassandraUrl, true, ConsistencyLevel.LOCAL_QUORUM)
 
 }
 

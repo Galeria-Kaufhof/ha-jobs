@@ -2,7 +2,7 @@ package de.kaufhof.hajobs
 
 import java.util.UUID
 
-import com.datastax.driver.core.ConsistencyLevel.QUORUM
+import com.datastax.driver.core.ConsistencyLevel.LOCAL_QUORUM
 import com.datastax.driver.core.querybuilder.QueryBuilder
 import com.datastax.driver.core.querybuilder.QueryBuilder._
 import de.kaufhof.hajobs.utils.CassandraUtils
@@ -20,7 +20,7 @@ import scala.util.control.NonFatal
 
 /**
  * Repository to manage job status in the database.
- * Write and Read Methods can be called with Consitency Level Quorum
+ * Write and Read Methods can be called with Consitency Level LOCAL_QUORUM
  * to get consistent Job data from Cassandra. This is necessary to prevent
  * the JobSupervisor from setting Finished Jobs to Dead Jobs
  */
@@ -50,7 +50,7 @@ class JobStatusRepository(session: Session,
       .value(JobResultColumn, jobStatus.jobResult.toString)
       .value(TriggerIdColumn, jobStatus.triggerId)
       .using(QueryBuilder.ttl(ttl.toSeconds.toInt))
-    stmt.setConsistencyLevel(QUORUM)
+    stmt.setConsistencyLevel(LOCAL_QUORUM)
     stmt
   }
 
@@ -64,7 +64,7 @@ class JobStatusRepository(session: Session,
       .value(ContentColumn, jobStatus.content.map(_.toString()).orNull)
       .value(TriggerIdColumn, jobStatus.triggerId)
       .using(QueryBuilder.ttl(ttl.toSeconds.toInt))
-    stmt.setConsistencyLevel(QUORUM)
+    stmt.setConsistencyLevel(LOCAL_QUORUM)
     stmt
   }
 
@@ -80,14 +80,14 @@ class JobStatusRepository(session: Session,
   /**
    * Finds the latest job status entries for all jobs.
    */
-  def getAllMetadata(readWithQuorum: Boolean = false)(implicit ec: ExecutionContext): Future[List[JobStatus]] = {
+  def getAllMetadata(readwithQuorum: Boolean = false)(implicit ec: ExecutionContext): Future[List[JobStatus]] = {
     import scala.collection.JavaConversions._
 
     val selectStmt = select().all().from(MetaTable)
 
-    if (readWithQuorum) {
+    if (readwithQuorum) {
       // setConsistencyLevel returns "this", we do not need to reassign
-      selectStmt.setConsistencyLevel(ConsistencyLevel.QUORUM)
+      selectStmt.setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM)
     }
 
     val resultFuture: ResultSetFuture = session.executeAsync(selectStmt)
@@ -111,7 +111,7 @@ class JobStatusRepository(session: Session,
       .and(QueryBuilder.eq(JobIdColumn, jobId))
 
     if (withQuorum) {
-      selectStmt.setConsistencyLevel(QUORUM)
+      selectStmt.setConsistencyLevel(LOCAL_QUORUM)
     }
 
     val resultFuture: ResultSetFuture = session.executeAsync(selectStmt)
@@ -130,7 +130,7 @@ class JobStatusRepository(session: Session,
       .limit(limit)
 
     if (withQuorum) {
-      selectStmt.setConsistencyLevel(QUORUM)
+      selectStmt.setConsistencyLevel(LOCAL_QUORUM)
     }
 
     val resultFuture: ResultSetFuture = session.executeAsync(selectStmt)
@@ -149,7 +149,7 @@ class JobStatusRepository(session: Session,
       .limit(1)
 
     if (withQuorum) {
-      selectStmt.setConsistencyLevel(QUORUM)
+      selectStmt.setConsistencyLevel(LOCAL_QUORUM)
     }
 
 
