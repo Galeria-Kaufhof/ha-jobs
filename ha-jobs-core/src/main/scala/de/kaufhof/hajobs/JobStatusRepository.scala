@@ -80,12 +80,12 @@ class JobStatusRepository(session: Session,
   /**
    * Finds the latest job status entries for all jobs.
    */
-  def getAllMetadata(readWithQuorum: Boolean = false)(implicit ec: ExecutionContext): Future[List[JobStatus]] = {
+  def getAllMetadata(readwithQuorum: Boolean = false)(implicit ec: ExecutionContext): Future[List[JobStatus]] = {
     import scala.collection.JavaConversions._
 
     val selectStmt = select().all().from(MetaTable)
 
-    if (readWithQuorum) {
+    if (readwithQuorum) {
       // setConsistencyLevel returns "this", we do not need to reassign
       selectStmt.setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM)
     }
