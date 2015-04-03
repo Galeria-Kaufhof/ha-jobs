@@ -11,8 +11,8 @@ val projectSettings = Seq(
 )
 
 val buildSettings = Seq(
-  scalaVersion := "2.11.4",
-  crossScalaVersions := Seq("2.10.4", "2.11.4"),
+  scalaVersion := "2.11.6",
+  crossScalaVersions := Seq("2.10.5", "2.11.6"),
   scalacOptions ++= Seq("-language:reflectiveCalls", "-feature", "-deprecation"),
   // fork (tests) to free resources. otherwise c* sessions are collected and will OOME at some point
   fork := true
