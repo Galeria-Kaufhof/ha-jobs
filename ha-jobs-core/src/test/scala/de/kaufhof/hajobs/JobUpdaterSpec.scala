@@ -19,7 +19,7 @@ class JobUpdaterSpec extends StandardSpec {
 
     "set jobStatus of dead jobs to dead" in {
       when(lockRepository.getAll()).thenReturn(Future.successful(Seq.empty))
-      when(jobStatusRepository.getAllMetadata(anyBoolean())(any())).thenReturn(Future.successful(List(job)))
+      when(jobStatusRepository.getLatestMetadata(anyBoolean())(any())).thenReturn(Future.successful(List(job)))
       when(jobStatusRepository.updateJobState(any(), any())(any())).thenReturn(Future.successful(job))
 
       val jobUpdater = new JobUpdater(lockRepository, jobStatusRepository)

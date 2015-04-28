@@ -13,9 +13,4 @@ object TestLockTypes extends LockTypes {
 object JobType1 extends JobType("testJob1", LockType1)
 object JobType2 extends JobType("testJob2", LockType2)
 
-object TestJobTypes extends JobTypes {
-  override protected def byName: PartialFunction[String, JobType] = {
-    case JobType1.name => JobType1
-    case JobType2.name => JobType2
-  }
-}
+object TestJobTypes extends JobTypes(List(JobType1, JobType2))
