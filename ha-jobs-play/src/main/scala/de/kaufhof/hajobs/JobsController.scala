@@ -31,7 +31,7 @@ class JobsController(jobManager: JobManager,
    * If no job executions are found 404 is returned.
    */
   def latest(jobTypeString: String): Action[AnyContent] = Action.async {
-    stringToJobType(jobTypeString).map { jobType =>
+    jobTypes(jobTypeString).map { jobType =>
       val jobStatusFuture: Future[List[JobStatus]] = jobManager.allJobStatus(jobType)
       jobStatusFuture.map(_.headOption).map {
         case Some(j: JobStatus) =>
@@ -46,7 +46,7 @@ class JobsController(jobManager: JobManager,
    */
   def status(jobTypeString: String, jobIdAsString: String): Action[AnyContent] = Action.async {
     Try(UUID.fromString(jobIdAsString)).map { uuid =>
-      stringToJobType(jobTypeString).map { jobType =>
+      jobTypes(jobTypeString).map { jobType =>
         val jobStatusFuture: Future[Option[JobStatus]] = jobManager.jobStatus(jobType, uuid)
         jobStatusFuture.map {
           case Some(j: JobStatus) => Ok(Json.toJson(j))
@@ -60,7 +60,7 @@ class JobsController(jobManager: JobManager,
    * Returns the list of job executions for the given job type.
    */
   def list(jobTypeString: String): Action[AnyContent] = Action.async {
-    stringToJobType(jobTypeString).map { jobType =>
+    jobTypes(jobTypeString).map { jobType =>
       val jobStatusFuture: Future[List[JobStatus]] = jobManager.allJobStatus(jobType)
       jobStatusFuture.map { jobs =>
         Ok(Json.obj("jobs" -> jobs, "latest" -> jobs.headOption.map(job => statusUrl(jobType, job.jobId))))
@@ -72,7 +72,7 @@ class JobsController(jobManager: JobManager,
    * Starts the execution of the given job type.
    */
   def run(jobTypeString: String): Action[AnyContent] = Action.async { implicit request =>
-    stringToJobType(jobTypeString).map { jobType =>
+    jobTypes(jobTypeString).map { jobType =>
       jobManager.triggerJob(jobType).map {
         case Started(newJobId, None) =>
           Created(Json.obj("status" -> "OK"))
@@ -101,5 +101,4 @@ class JobsController(jobManager: JobManager,
     }.getOrElse(Future.successful(NotFound))
   }
 
-  private def stringToJobType(str: String) = Try(Some(jobTypes(str))).getOrElse(None)
 }
