@@ -82,7 +82,7 @@ class JobSupervisor(jobManager: => JobManager,
    * @return
    */
   private[hajobs] def retriggerJobs(): Future[Seq[JobStartStatus]] = {
-    jobStatusRepository.getAllMetadata().flatMap { allJobs =>
+    jobStatusRepository.getLatestMetadata().flatMap { allJobs =>
       val a = allJobs.groupBy(_.jobType).flatMap { case (jobType, jobStatus) =>
         triggerIdToRetrigger(jobType, jobStatus).map { triggerId =>
           logger.info(s"Retriggering job of type $jobType with triggerid $triggerId")

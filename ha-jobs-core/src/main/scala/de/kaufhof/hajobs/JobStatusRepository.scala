@@ -5,6 +5,7 @@ import java.util.UUID
 import com.datastax.driver.core.ConsistencyLevel.LOCAL_QUORUM
 import com.datastax.driver.core.querybuilder.QueryBuilder
 import com.datastax.driver.core.querybuilder.QueryBuilder._
+import com.datastax.driver.core.querybuilder.Select.Where
 import de.kaufhof.hajobs.utils.CassandraUtils
 import CassandraUtils._
 import com.datastax.driver.core._
@@ -79,22 +80,30 @@ class JobStatusRepository(session: Session,
 
   /**
    * Finds the latest job status entries for all jobs.
+   * Every JobState is loaded with a single select statement
+   * It is recommened to use partition keys if possible and avoid
+   * IN statement in WHERE clauses, therefore we prefer to execute
+   * more than one select statement
    */
-  def getAllMetadata(readWithQuorum: Boolean = false)(implicit ec: ExecutionContext): Future[List[JobStatus]] = {
-    import scala.collection.JavaConversions._
+  def getLatestMetadata(readwithQuorum: Boolean = false)(implicit ec: ExecutionContext): Future[List[JobStatus]] = {
 
-    val selectStmt = select().all().from(MetaTable)
-
-    if (readWithQuorum) {
-      // setConsistencyLevel returns "this", we do not need to reassign
-      selectStmt.setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM)
+    def getLatest(jobType: JobType, withQuorum: Boolean) = {
+      val stmt: Where = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name))
+      if (withQuorum) {
+        // setConsistencyLevel returns "this", we do not need to reassign
+        stmt.setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM)
+      }
+      stmt
     }
 
-    val resultFuture: ResultSetFuture = session.executeAsync(selectStmt)
-    resultFuture.map( res =>
-      res.all().toList.flatMap( result =>
-        rowToStatus(result, isMeta = true)
-      ))
+    val results = jobTypes.all.map { jobType =>
+      session.executeAsync(getLatest(jobType, readwithQuorum)).map(res =>
+        Option(res.one).flatMap(result =>
+          rowToStatus(result, isMeta = true)
+        ))
+
+    }
+    Future.sequence(results).map(_.flatten)
   }
 
   /**
@@ -162,19 +171,25 @@ class JobStatusRepository(session: Session,
 
   private def rowToStatus(row: Row, isMeta: Boolean): Option[JobStatus] = {
     try {
-      Some(JobStatus(
-        row.getUUID(TriggerIdColumn),
-        jobTypes(row.getString(JobTypeColumn)),
-        row.getUUID(JobIdColumn),
-        JobState.withName(row.getString(JobStateColumn)),
-        JobResult.withName(row.getString(JobResultColumn)),
-        new DateTime(row.getDate(TimestampColumn).getTime),
-        if (!isMeta) {
-          readContent(row)
-        } else {
+      val jobTypeName: String = row.getString(JobTypeColumn)
+      jobTypes(jobTypeName) match {
+        case Some(jobType) =>
+          Some(JobStatus(
+            row.getUUID(TriggerIdColumn),
+            jobType,
+            row.getUUID(JobIdColumn),
+            JobState.withName(row.getString(JobStateColumn)),
+            JobResult.withName(row.getString(JobResultColumn)),
+            new DateTime(row.getDate(TimestampColumn).getTime),
+            if (!isMeta) {
+              readContent(row)
+            } else {
+              None
+            }
+          ))
+        case None => logger.error(s"Could not find Jobtype for name: $jobTypeName")
           None
-        }
-      ))
+      }
     } catch {
       case NonFatal(e) =>
         logger.error("error mapping a JobStatus datarow to JobStatus object", e)

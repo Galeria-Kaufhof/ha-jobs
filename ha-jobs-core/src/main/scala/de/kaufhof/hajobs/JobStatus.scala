@@ -1,16 +1,15 @@
 package de.kaufhof.hajobs
 
-import java.util.{NoSuchElementException, UUID}
+import java.util.UUID
 
+import de.kaufhof.hajobs.JobResult.JobResult
+import de.kaufhof.hajobs.JobState.JobState
 import de.kaufhof.hajobs.utils.EnumJsonSupport
-import JobResult.JobResult
-import JobState.JobState
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import play.api.libs.json.{JsValue, _}
 
 import scala.language.implicitConversions
-import scala.util.Try
 import scala.util.control.NonFatal
 
 /**
@@ -58,7 +57,7 @@ object JobType {
 
   implicit def jobTypeReads(implicit jobTypes: JobTypes): Reads[JobType] = new Reads[JobType] {
     def reads(json: JsValue): JsResult[JobType] = json match {
-      case JsString(s) => Try(jobTypes(s)).map(JsSuccess(_)).getOrElse(JsError(s"No JobType found with name '$s'"))
+      case JsString(s) => jobTypes(s).map(JsSuccess(_)).getOrElse(JsError(s"No JobType found with name '$s'"))
       case _ => JsError("String value expected")
     }
   }
@@ -69,30 +68,16 @@ object JobType {
 
 }
 
-trait JobTypes {
+class JobTypes(val all: List[JobType]) {
 
-  import JobTypes._
+  val fullList = all :+ JobTypes.JobSupervisor
 
   /**
-   * Resolves a JobType by name. Compares built in JobTypes and if none matched
-   * delegates to [[byName]].
-   *
-   * Throws a NoSuchElementException if there's no JobType
-   * with the given name. In this case exception is preferred over returning an Option to be
-   * more conformant with the other JobStatus enums.
+   * Resolves a JobType by name. Compares built in JobType and given JobTypes.
    */
-  @throws[NoSuchElementException]
-  final def apply(name: String): JobType = lookup(name)
-
-  private def lookup: PartialFunction[String, JobType] = byName orElse {
-    case JobSupervisor.name => JobSupervisor
-    case unknown => throw new NoSuchElementException(s"Could not find JobType with name '$unknown'.")
+  def apply(name: String): Option[JobType] = {
+    fullList.find(_.name == name)
   }
-
-  /**
-   * Resolves a JobType by name.
-   */
-  protected def byName: PartialFunction[String, JobType]
 
 }
 
@@ -100,10 +85,7 @@ object JobTypes {
 
   object JobSupervisor extends JobType("supervisor", lockType = LockTypes.JobSupervisorLock)
 
-  def apply(jobTypes: JobType*): JobTypes = new JobTypes {
-    private val jobTypesByName = jobTypes.map(jobType => jobType.name -> jobType).toMap
-    override protected def byName: PartialFunction[String, JobType] = jobTypesByName
-  }
+  def apply(jobTypes: JobType*): JobTypes = new JobTypes(jobTypes.toList)
 
 }
 

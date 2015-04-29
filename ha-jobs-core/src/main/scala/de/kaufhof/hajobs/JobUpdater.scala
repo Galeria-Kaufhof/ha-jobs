@@ -25,7 +25,7 @@ class JobUpdater(lockRepository: LockRepository, jobStatusRepository: JobStatusR
       // we also need to read with quorom to ensure we get the most current
       // (and consistent) data
       locks <- lockRepository.getAll()
-      jobs <- jobStatusRepository.getAllMetadata(readWithQuorum = true)
+      jobs <- jobStatusRepository.getLatestMetadata(readwithQuorum = true)
 
       runningJobs = jobs.filter(_.jobResult == JobResult.Pending)
       deadJobs = runningJobs.filterNot(job => locks.exists(_.jobId == job.jobId))

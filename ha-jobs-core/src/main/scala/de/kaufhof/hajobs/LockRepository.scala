@@ -8,12 +8,13 @@ import CassandraUtils._
 import com.datastax.driver.core._
 import com.datastax.driver.core.querybuilder.QueryBuilder._
 import com.datastax.driver.core.querybuilder.{Insert, QueryBuilder}
+import org.slf4j.LoggerFactory._
 
 import scala.collection.JavaConversions._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
  * This repository manages locks for jobs syncronization in distributed environments.
@@ -28,6 +29,8 @@ import scala.util.Try
  * @param session
  */
 class LockRepository(session: Session, lockTypes: LockTypes) {
+
+  private val logger = getLogger(getClass)
 
   private val Table = "lock"
 
@@ -129,17 +132,27 @@ class LockRepository(session: Session, lockTypes: LockTypes) {
 
   /**
    * Returns a list of Locks (jobType + jobId).
+   * To avoid select * statement without key in where clause,
+   * we do multiple select statements with given primary key
    */
   def getAll()(implicit ec: ExecutionContext): Future[Seq[Lock]] = {
-    val query = select().all().from(Table).setConsistencyLevel(LOCAL_QUORUM)
-    session.executeAsync(query).map(rs =>
-      rs.all().foldLeft(Seq.empty[Lock]) { (res, row) =>
-        val lockTypeName = row.getString(LockTypeCol)
-        Try(lockTypes(lockTypeName))
-          .map(lockType => res :+ Lock(lockType, row.getUUID(LockCol)))
-          .getOrElse(res)
-      }
-    )
+    def getLock(lockType: LockType) = select().all().from(Table)
+      .where(QueryBuilder.eq(LockTypeCol, lockType.name))
+      .setConsistencyLevel(LOCAL_QUORUM)
+
+    val res = lockTypes.all.map { lockType =>
+      session.executeAsync(getLock(lockType)).map(rs =>
+        Option(rs.one).flatMap { row =>
+          val lockTypeName = row.getString(LockTypeCol)
+          lockTypes(lockTypeName) match {
+            case Some(lockType) => Some(Lock(lockType, row.getUUID(LockCol)))
+            case None => logger.error(s"Could not find matching lock type for name: $lockTypeName")
+              None
+          }
+        }
+      )
+    }
+    Future.sequence(res).map(_.flatten)
   }
 
   def clear(): Future[ResultSet] = {
