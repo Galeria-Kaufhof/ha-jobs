@@ -15,14 +15,14 @@ case class Lock(lockType: LockType, jobId: UUID)
  */
 case class LockType(name: String)
 
-class LockTypes(lockTypes: Seq[LockType]) {
+class LockTypes(val all: Seq[LockType]) {
+
+  val fullList = all :+ JobSupervisorLock
 
   /**
    * Resolves a LockType by name. Compares built in LockTypes and given LockTypes.
    */
-  final def apply(name: String): Option[LockType] = (lockTypes :+ JobSupervisorLock).find(_.name == name)
-
-  def all: Seq[LockType] = lockTypes
+  final def apply(name: String): Option[LockType] = fullList.find(_.name == name)
 
 }
 

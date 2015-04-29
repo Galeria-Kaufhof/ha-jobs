@@ -68,16 +68,16 @@ object JobType {
 
 }
 
-class JobTypes(jobTypeList: List[JobType]) {
+class JobTypes(val all: List[JobType]) {
+
+  val fullList = all :+ JobTypes.JobSupervisor
 
   /**
    * Resolves a JobType by name. Compares built in JobType and given JobTypes.
    */
   def apply(name: String): Option[JobType] = {
-    (jobTypeList :+ JobTypes.JobSupervisor).find(_.name == name)
+    fullList.find(_.name == name)
   }
-
-  def all: List[JobType] = jobTypeList
 
 }
 
