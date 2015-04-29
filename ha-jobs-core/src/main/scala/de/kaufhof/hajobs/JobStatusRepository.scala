@@ -87,7 +87,7 @@ class JobStatusRepository(session: Session,
    */
   def getLatestMetadata(readwithQuorum: Boolean = false)(implicit ec: ExecutionContext): Future[List[JobStatus]] = {
 
-    def selectStmt(jobType: JobType, withQuorum: Boolean) = {
+    def getLatest(jobType: JobType, withQuorum: Boolean) = {
       val stmt: Where = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name))
       if (withQuorum) {
         // setConsistencyLevel returns "this", we do not need to reassign
@@ -97,7 +97,7 @@ class JobStatusRepository(session: Session,
     }
 
     val results = jobTypes.all.map { jobType =>
-      session.executeAsync(selectStmt(jobType, readwithQuorum)).map(res =>
+      session.executeAsync(getLatest(jobType, readwithQuorum)).map(res =>
         Option(res.one).flatMap(result =>
           rowToStatus(result, isMeta = true)
         ))

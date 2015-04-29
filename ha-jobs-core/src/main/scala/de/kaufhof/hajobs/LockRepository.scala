@@ -136,12 +136,12 @@ class LockRepository(session: Session, lockTypes: LockTypes) {
    * we do multiple select statements with given primary key
    */
   def getAll()(implicit ec: ExecutionContext): Future[Seq[Lock]] = {
-    def query(lockType: LockType) = select().all().from(Table)
+    def getLock(lockType: LockType) = select().all().from(Table)
       .where(QueryBuilder.eq(LockTypeCol, lockType.name))
       .setConsistencyLevel(LOCAL_QUORUM)
 
     val res = lockTypes.all.map { lockType =>
-      session.executeAsync(query(lockType)).map(rs =>
+      session.executeAsync(getLock(lockType)).map(rs =>
         Option(rs.one).flatMap { row =>
           val lockTypeName = row.getString(LockTypeCol)
           lockTypes(lockTypeName) match {
