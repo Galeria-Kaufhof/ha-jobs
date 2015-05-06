@@ -6,6 +6,7 @@ import org.joda.time.DateTime
 import org.mockito.Matchers._
 import org.mockito.Mockito._
 import MockInitializers._
+import play.api.libs.json.Json
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -23,12 +24,14 @@ class JobSupervisorSpec extends StandardSpec {
 
   "update job state in JobSupervisor" should {
     val jobStatus = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Running, JobResult.Pending, DateTime.now(), None)
+    val jobStatusWithContent = jobStatus.copy(content = Some(Json.toJson("some json")))
     val jobManager = mock[JobManager]
 
     "change the state of failed jobs to FAILED" in {
       when(lockRepository.getAll()(any())).thenReturn(Future.successful(Seq.empty))
       when(jobStatusRepository.getLatestMetadata(anyBoolean())(any())).thenReturn(Future.successful(List(jobStatus)))
       when(jobStatusRepository.updateJobState(any(), any())(any())).thenAnswer(futureIdentityAnswer())
+      when(jobStatusRepository.get(any(), any(), anyBoolean())(any())).thenReturn(Future.successful(Some(jobStatusWithContent)))
 
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
 
@@ -36,7 +39,7 @@ class JobSupervisorSpec extends StandardSpec {
       val jobExecution = sut.run()
       await(jobExecution.result)
 
-      verify(jobStatusRepository, times(1)).updateJobState(jobStatus, JobState.Dead)
+      verify(jobStatusRepository, times(1)).updateJobState(jobStatusWithContent, JobState.Dead)
     }
 
     "not change the state of still running jobs" in {
