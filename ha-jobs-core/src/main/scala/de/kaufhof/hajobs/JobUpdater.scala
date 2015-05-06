@@ -8,6 +8,8 @@ import scala.concurrent.Future
 /**
  * JobUpdater is responsible finding running/pending jobs that have lost its lock
  * and set them to status failed/dead
+ * JobUpdater tries to get latest JobStatusData to update status, so one can
+ * see the latest content of the dead job.
  * @param lockRepository see which jobs actually have a lock
  * @param jobStatusRepository find all the jobStatus
  */
@@ -41,9 +43,13 @@ class JobUpdater(lockRepository: LockRepository, jobStatusRepository: JobStatusR
       Future.successful(List.empty)
     } else {
       logger.info("Detected dead jobs, changing state to DEAD for: {}", deadJobs.map(_.jobId).mkString(","))
-      val updateResults = deadJobs.map(job =>
-        jobStatusRepository.updateJobState(job, JobState.Dead)
-      )
+      val updateResults = deadJobs.map { jobMeta =>
+        jobStatusRepository.get(jobMeta.jobType, jobMeta.jobId).flatMap {
+          case Some(data) => jobStatusRepository.updateJobState(data, JobState.Dead)
+          // if no latest JobStatusData is found update JobStatusMeta instead
+          case None => jobStatusRepository.updateJobState(jobMeta, JobState.Dead)
+        }
+      }
       Future.sequence(updateResults)
     }
   }
