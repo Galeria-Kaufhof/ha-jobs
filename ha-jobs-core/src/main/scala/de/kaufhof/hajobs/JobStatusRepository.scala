@@ -5,7 +5,6 @@ import java.util.UUID
 import com.datastax.driver.core.ConsistencyLevel.LOCAL_QUORUM
 import com.datastax.driver.core.querybuilder.QueryBuilder
 import com.datastax.driver.core.querybuilder.QueryBuilder._
-import com.datastax.driver.core.querybuilder.Select.Where
 import de.kaufhof.hajobs.utils.CassandraUtils
 import CassandraUtils._
 import com.datastax.driver.core._
@@ -166,14 +165,18 @@ class JobStatusRepository(session: Session,
   }
 
   private def rowToStatus(row: Row, isMeta: Boolean): Option[JobStatus] = {
+
+    def table = if(isMeta) "job_status_meta" else "job_status_data"
+
+    val jobTypeName = row.getString(JobTypeColumn)
+    val jobId = row.getUUID(JobIdColumn)
     try {
-      val jobTypeName: String = row.getString(JobTypeColumn)
       jobTypes(jobTypeName) match {
         case Some(jobType) =>
           Some(JobStatus(
             row.getUUID(TriggerIdColumn),
             jobType,
-            row.getUUID(JobIdColumn),
+            jobId,
             JobState.withName(row.getString(JobStateColumn)),
             JobResult.withName(row.getString(JobResultColumn)),
             new DateTime(row.getDate(TimestampColumn).getTime),
@@ -183,12 +186,12 @@ class JobStatusRepository(session: Session,
               None
             }
           ))
-        case None => logger.error(s"Could not find Jobtype for name: $jobTypeName")
+        case None => logger.error(s"Could not find JobType for name: $jobTypeName (table $table)")
           None
       }
     } catch {
       case NonFatal(e) =>
-        logger.error("error mapping a JobStatus datarow to JobStatus object", e)
+        logger.error(s"Could not map $table row to JobStatus object for $jobTypeName job $jobId.", e)
         None
     }
   }
