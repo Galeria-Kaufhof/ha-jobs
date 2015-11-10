@@ -30,6 +30,8 @@ class KeepJobLockedActor(lockRepository: LockRepository, jobType: JobType, jobId
   }
 
   def receive: Receive = {
+    case InfoRequest =>
+      sender() ! InfoResponse(jobId, lastSuccess, isCanceled)
     case Cancel =>
       if (!isCanceled) {
         log.info("Job cancelled because of lost lock for job {} / {}", jobType.name, jobId)
@@ -77,4 +79,6 @@ object KeepJobLockedActor {
 
   case object Tick
   case object Cancel
+  case object InfoRequest
+  case class InfoResponse(jobId: UUID, lastSuccess: DateTime, isCanceled: Boolean)
 }
