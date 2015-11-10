@@ -28,10 +28,14 @@ class JobManager(managedJobs: => Jobs,
                  jobStatusRepo: JobStatusRepository,
                  actorSystem: ActorSystem,
                  scheduler: Scheduler,
-                 enableJobScheduling: Boolean) {
+                 enableJobScheduling: Boolean,
+                 schedulesTimeZone: TimeZone) {
 
-  def this(jobs: Seq[Job], lockRepo: LockRepository, jobStatusRepo: JobStatusRepository, actorSystem: ActorSystem, sched: Scheduler = JobManager.createScheduler, enableJobScheduling: Boolean = true) =
-    this(Jobs(jobs), lockRepo, jobStatusRepo, actorSystem, sched, enableJobScheduling)
+  def this(jobs: Seq[Job], lockRepo: LockRepository, jobStatusRepo: JobStatusRepository,
+           actorSystem: ActorSystem, sched: Scheduler = JobManager.createScheduler,
+           enableJobScheduling: Boolean = true,
+           schedulesTimeZone: TimeZone = TimeZone.getTimeZone("UTC")) =
+    this(Jobs(jobs), lockRepo, jobStatusRepo, actorSystem, sched, enableJobScheduling, schedulesTimeZone)
 
   private val logger = getLogger(getClass)
 
@@ -74,7 +78,7 @@ class JobManager(managedJobs: => Jobs,
           .withSchedule(CronScheduleBuilder
           // this will throw an exception if the expression is incorrect
           .cronSchedule(cronExpression)
-          .inTimeZone(TimeZone.getTimeZone("UTC"))
+            .inTimeZone(schedulesTimeZone)
           ).build()
 
         scheduler.scheduleJob(job, trigger)
