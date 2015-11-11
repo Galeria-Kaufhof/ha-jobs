@@ -2,36 +2,17 @@ package de.kaufhof.hajobs
 
 import java.util.UUID
 
-import akka.actor.{ActorRef, ActorSystem}
-import akka.testkit.{ImplicitSender, TestKit}
 import com.datastax.driver.core.utils.UUIDs
+import de.kaufhof.hajobs.testutils.ActorSpec
 import org.mockito.Matchers._
 import org.mockito.Mockito._
-import org.scalatest._
 import org.scalatest.concurrent.Eventually._
-import org.scalatest.mock.MockitoSugar
-import org.scalatest.time.{Millis, Span}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class KeepJobLockedActorSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEachTestData with MockitoSugar {
-
-  def this() = this(ActorSystem("KeepJobLockedSpec"))
-
-  implicit val patienceConfig = new PatienceConfig(scaled(Span(5000, Millis)))
-
-  override def afterAll {
-    TestKit.shutdownActorSystem(system)
-  }
-
-  var aut: ActorRef = null
-
-  override def afterEach(testData: TestData): Unit = {
-    system.stop(aut)
-  }
+class KeepJobLockedActorSpec extends ActorSpec("KeepJobLockedSpec") {
 
   "An KeepJobLocked actor" must {
     "cancel a job if it loses its lock" in {

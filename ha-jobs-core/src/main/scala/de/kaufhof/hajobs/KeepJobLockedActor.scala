@@ -34,7 +34,7 @@ class KeepJobLockedActor(lockRepository: LockRepository, jobType: JobType, jobId
       sender() ! InfoResponse(jobId, lastSuccess, isCanceled)
     case Cancel =>
       if (!isCanceled) {
-        log.info("Job cancelled because of lost lock for job {} / {}", jobType.name, jobId)
+        log.info("Cancelling lock keeping because of lost lock for job {} / {}", jobType.name, jobId)
         onLockLost()
         isCanceled = true
       }

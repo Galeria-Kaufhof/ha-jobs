@@ -46,22 +46,30 @@ class JobExecutor(lockRepo: LockRepository) extends Actor with ActorLogging {
       jobs.get(ctxt.jobId) match {
         case Some(running) =>
           log.info("Job {} / {} completed, cleaning up...", ctxt.jobType.name, ctxt.jobId)
-          lockRepo.releaseLock(ctxt.jobType, ctxt.jobId)
-          context.stop(running.lockKeeper)
+          running.lockKeeper.foreach { lockKeeper =>
+            context.stop(lockKeeper)
+            lockRepo.releaseLock(ctxt.jobType, ctxt.jobId)
+          }
         case None =>
           log.warning("On Completed: Found no running job {} with id {}", ctxt.jobType.name, ctxt.jobId)
       }
       context.become(running(jobs - ctxt.jobId))
     case LostLock(ctxt) =>
-      jobs.get(ctxt.jobId) match {
+      val newState = jobs.get(ctxt.jobId) match {
         case Some(running) =>
           log.info("Lost lock for job {} / {}, asking job to cancel", ctxt.jobType.name, ctxt.jobId)
+          // We can already stop the lock keeper, and by setting it to None on the running job we know later (on Completed),
+          // that we don't have to releaseLock
+          running.lockKeeper.foreach(context.stop)
           // jobExecution.cancel() should complete() the jobExecution.result, which should trigger a Completed msg
           running.jobExecution.cancel()
+          // we must keep the job so that we can handle Completed accordingly
+          jobs.updated(ctxt.jobId, running.copy(lockKeeper = None))
         case None =>
           log.warning("On LostLock: Found no running job {} / {}", ctxt.jobType.name, ctxt.jobId)
+          jobs - ctxt.jobId
       }
-      context.become(running(jobs - ctxt.jobId))
+      context.become(running(newState))
     case Cancel(jobType) =>
       jobs.values.filter(_.job.jobType == jobType).foreach { running =>
         log.info("Canceling job {} / {}", jobType.name, running.jobExecution.context.jobId)
@@ -95,7 +103,7 @@ class JobExecutor(lockRepo: LockRepository) extends Actor with ActorLogging {
             KeepJobLockedActor.props(lockRepo, job.jobType, jobId, job.lockTimeout, () => self ! LostLock(jobContext)), lockKeeperName
           )
 
-          Future.successful(Running(job, execution, lockKeeper))
+          Future.successful(Running(job, execution, Some(lockKeeper)))
         } catch {
           case e: InvalidActorNameException =>
             logInvalidActorNameException(e, job, triggerId, runningJobs, lockKeeperName)
@@ -127,21 +135,29 @@ class JobExecutor(lockRepo: LockRepository) extends Actor with ActorLogging {
           job.jobType.name, triggerId)
       )
     }
-    
+
+    def lookupAndLogInfoFromLockKeeper() {
+      context.actorSelection(lockKeeperName).resolveOne().onComplete {
+        case Success(lockKeeper) =>
+          logLockKeeperInfo(lockKeeper)
+        case Failure(e2) =>
+          log.info("Could not find lock keeper for aborted job {} (triggerId {}).", job.jobType.name, triggerId)
+      }
+    }
     runningJobs.collectFirst { case (runningJobId, running) if running.job.jobType == job.jobType => (running.jobExecution.context, running.lockKeeper) } match {
-      case Some((jobContext, lockKeeper)) =>
+      case Some((jobContext, Some(lockKeeper))) =>
         log.error(e, s"Error starting job {} (triggerId {}), releasing lock. Found running job with jobId ${jobContext.jobId}, triggerId ${jobContext.triggerId}." +
           " Requesting info from lock keeper, stay tuned.",
           job.jobType.name, triggerId)
         logLockKeeperInfo(lockKeeper)
+      case Some((jobContext, None)) =>
+        log.error(e, s"Error starting job {} (triggerId {}), releasing lock. Found running job with jobId ${jobContext.jobId}, triggerId ${jobContext.triggerId}." +
+          " Looking up lock keeper actor to get more info, stay tuned",
+          job.jobType.name, triggerId)
+        lookupAndLogInfoFromLockKeeper()
       case None =>
         log.error(e, "Error starting job {} (triggerId {}), releasing lock. No running job found, looking up lock keeper actor, stay tuned.", job.jobType.name, triggerId)
-        context.actorSelection(lockKeeperName).resolveOne().onComplete {
-          case Success(lockKeeper) =>
-            logLockKeeperInfo(lockKeeper)
-          case Failure(e2) =>
-            log.info("Could not find lock keeper for aborted job {} (triggerId {}).", job.jobType.name, triggerId)
-        }
+        lookupAndLogInfoFromLockKeeper()
     }
   }
 
@@ -165,7 +181,7 @@ object JobExecutor {
    * Sent by the JobExecutor actor to itself when the job was successfully started. Also
    * used to store job execution related info for a jobId.
    */
-  private[JobExecutor] case class Running(job: Job, jobExecution: JobExecution, lockKeeper: ActorRef) extends JobStartStatus
+  private[JobExecutor] case class Running(job: Job, jobExecution: JobExecution, lockKeeper: Option[ActorRef]) extends JobStartStatus
 
   /**
    * Sent by the onLockLost callback invoked by the KeepJobLockedActor to the JobExecutor actor
