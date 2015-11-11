@@ -2,19 +2,17 @@ package de.kaufhof.hajobs
 
 import java.util.UUID
 
-import com.datastax.driver.core.ConsistencyLevel.LOCAL_QUORUM
-import de.kaufhof.hajobs.utils.CassandraUtils
-import CassandraUtils._
+import com.datastax.driver.core.ConsistencyLevel.{LOCAL_QUORUM, LOCAL_SERIAL}
 import com.datastax.driver.core._
 import com.datastax.driver.core.querybuilder.QueryBuilder._
 import com.datastax.driver.core.querybuilder.{Insert, QueryBuilder}
+import de.kaufhof.hajobs.utils.CassandraUtils
+import de.kaufhof.hajobs.utils.CassandraUtils._
 import org.slf4j.LoggerFactory._
 
-import scala.collection.JavaConversions._
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scala.language.postfixOps
-import scala.util.{Failure, Success, Try}
 
 /**
  * This repository manages locks for jobs syncronization in distributed environments.
@@ -47,6 +45,7 @@ class LockRepository(session: Session, lockTypes: LockTypes) {
       .ifNotExists()
     insertStmt.using(QueryBuilder.ttl((14 days).toSeconds.toInt))
     insertStmt.setConsistencyLevel(LOCAL_QUORUM)
+    insertStmt.setSerialConsistencyLevel(LOCAL_SERIAL)
 
     insertStmt
   }
@@ -60,6 +59,7 @@ class LockRepository(session: Session, lockTypes: LockTypes) {
       .onlyIf(QueryBuilder.eq(LockCol, null))
 
     stmt.setConsistencyLevel(LOCAL_QUORUM)
+    stmt.setSerialConsistencyLevel(LOCAL_SERIAL)
     stmt
   }
   //scalastyle:on
@@ -71,6 +71,7 @@ class LockRepository(session: Session, lockTypes: LockTypes) {
       .where(QueryBuilder.eq(LockTypeCol, lockType.name))
       .onlyIf(QueryBuilder.eq(LockCol, jobId))
     stmt.setConsistencyLevel(LOCAL_QUORUM)
+    stmt.setSerialConsistencyLevel(LOCAL_SERIAL)
     stmt
   }
 
@@ -80,6 +81,7 @@ class LockRepository(session: Session, lockTypes: LockTypes) {
       .where(QueryBuilder.eq(LockTypeCol, lockType.name))
       .onlyIf(QueryBuilder.eq(LockCol, jobId))
     stmt.setConsistencyLevel(LOCAL_QUORUM)
+    stmt.setSerialConsistencyLevel(LOCAL_SERIAL)
     stmt
   }
 
