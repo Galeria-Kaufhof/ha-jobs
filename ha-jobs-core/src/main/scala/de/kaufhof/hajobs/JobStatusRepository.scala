@@ -68,10 +68,10 @@ class JobStatusRepository(session: Session,
     stmt
   }
 
-  def save(jobStatus: JobStatus)(implicit ec: ExecutionContext): Future[JobStatus] = {
-    val batchStmt = batch(insertMetaQuery(jobStatus), insertDataQuery(jobStatus))
-    session.executeAsync(batchStmt).map(_ => jobStatus)
-  }
+  def save(jobStatus: JobStatus)(implicit ec: ExecutionContext): Future[JobStatus] = for {
+    _ <- session.executeAsync(insertDataQuery(jobStatus))
+    _ <- session.executeAsync(insertMetaQuery(jobStatus))
+  } yield jobStatus
 
   def updateJobState(jobStatus: JobStatus, newState: JobState)(implicit ec: ExecutionContext): Future[JobStatus] = {
     save(jobStatus.copy(jobState = newState, jobResult = JobStatus.stateToResult(newState), jobStatusTs = DateTime.now()))
