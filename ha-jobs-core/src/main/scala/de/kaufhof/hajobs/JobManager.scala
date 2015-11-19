@@ -6,11 +6,14 @@ import akka.pattern.ask
 import akka.actor.ActorSystem
 import akka.util.Timeout
 import com.datastax.driver.core.utils.UUIDs
+import org.joda.time.DateTime
 import org.quartz._
 import org.quartz.impl.DirectSchedulerFactory
 import org.quartz.simpl.{RAMJobStore, SimpleThreadPool}
 import org.slf4j.LoggerFactory.getLogger
+import play.api.libs.json.Json
 
+import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -124,6 +127,21 @@ class JobManager(managedJobs: => Jobs,
     val job = managedJobs(jobType)
     implicit val timeout = Timeout(5 seconds)
     (executor ? JobExecutor.Execute(job, triggerId)).mapTo[JobStartStatus]
+      .recoverWith {
+        case NonFatal(e) =>
+          logger.error(s"Error starting Job {} triggerId {}, set JobStatus to Failed! ", jobType, triggerId, e)
+          retry(3) {
+            jobStatusRepo.save(
+              JobStatus(triggerId, jobType, UUID.randomUUID(), JobState.Failed, JobResult.Failed, DateTime.now(), Some(Json.toJson(e.getMessage)))
+            )
+          }.map(_ => Error(s"Error starting Job $jobType triggerId $triggerId, set JobStatus to Failed! Msg: ${e.getMessage}"))
+            .recover {
+              case t =>
+                logger.error(s"Error while writing JobStatus for job {} triggerId {}", jobType, triggerId, t)
+                Error(s"Error starting Job $jobType triggerId $triggerId, setting JobStatus to Failed failed! Msg: ${e.getMessage} ${t.getMessage}")
+            }
+
+      }
   }
 
   def cancelJob(jobType: JobType): Unit = {
@@ -137,6 +155,16 @@ class JobManager(managedJobs: => Jobs,
 
   def jobStatus(jobType: JobType, jobId: UUID): Future[Option[JobStatus]] = jobStatusRepo.get(jobType, jobId)
 
+  /**
+   * Tries function max n times.
+   */
+  private final def retry[T](n: Int)(fn: => Future[T]): Future[T] = {
+    fn.recoverWith {
+      case _ if n > 1 => retry(n - 1)(fn)
+      case NonFatal(e) => Future.failed[T](e)
+    }
+  }
+
 }
 
 object JobManager {
@@ -147,7 +175,7 @@ object JobManager {
     logger.info("Creating quartz scheduler")
 
     // ensure scheduler is only registered once
-    if (!Option(DirectSchedulerFactory.getInstance.getScheduler("JobManagerScheduler")).isDefined) {
+    if (Option(DirectSchedulerFactory.getInstance.getScheduler("JobManagerScheduler")).isEmpty) {
       // we could use createVolatileScheduler, but we want to set the name of the thread pool
       val pool = new SimpleThreadPool()
       pool.setThreadNamePrefix("quartz-")

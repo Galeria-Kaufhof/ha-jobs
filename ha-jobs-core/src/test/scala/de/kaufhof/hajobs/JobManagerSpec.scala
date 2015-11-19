@@ -2,16 +2,21 @@ package de.kaufhof.hajobs
 
 import akka.actor.{ActorNotFound, ActorSystem}
 import com.datastax.driver.core.utils.UUIDs
+import de.kaufhof.hajobs
 import de.kaufhof.hajobs.JobManagerSpec._
+import de.kaufhof.hajobs.JobResult
 import de.kaufhof.hajobs.testutils.MockInitializers
 import org.mockito.Matchers._
 import org.mockito.Mockito._
+import org.mockito.invocation.InvocationOnMock
+import org.mockito.stubbing.Answer
 import org.quartz.Scheduler
+import org.scalatest.Matchers
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import play.api.Application
 import de.kaufhof.hajobs.testutils.StandardSpec
 
-import scala.concurrent.{blocking, Future}
+import scala.concurrent.{Promise, blocking, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -119,6 +124,31 @@ class JobManagerSpec extends StandardSpec {
 
       eventually(verify(lockRepository, times(1)).releaseLock(any(), any())(any()))
       eventually(an[ActorNotFound] shouldBe thrownBy(await(actorSystem.actorSelection(".*_LOCK").resolveOne())))
+    }
+
+    "set job to failed if job failed on start" in {
+      val mockedScheduler = mock[Scheduler]
+      val job = new TestJob() {
+        override def run()(implicit context: JobContext): JobExecution = throw new RuntimeException("test exception")
+      }
+      var jobStatus: List[JobStatus] = Nil
+      when(jobStatusRepository.save(any())(any())).thenAnswer(new Answer[Future[JobStatus]] {
+        override def answer(invocation: InvocationOnMock): Future[JobStatus] = {
+          jobStatus = List(invocation.getArguments.head.asInstanceOf[JobStatus])
+          Future.successful(jobStatus.head)
+        }
+
+      })
+      when(jobStatusRepository.getLatestMetadata(any())(any())).thenAnswer(new Answer[Future[List[JobStatus]]] {
+        override def answer(invocation: InvocationOnMock): Future[List[JobStatus]] = Future.successful(jobStatus)
+      })
+
+      val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, false)
+      await(manager.retriggerJob(JobType1, UUIDs.timeBased()))
+
+      verify(jobStatusRepository, times(1)).save(any())(any())
+      await(jobStatusRepository.getLatestMetadata()).head.jobResult should be(JobResult.Failed)
+
     }
   }
 }
