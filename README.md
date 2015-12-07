@@ -5,6 +5,15 @@
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
+## New in 1.2.0
+
+While 1.2.0 being binary backwards compatible, the routes file of the Play! Module should be changed: the `list` action got a
+new (optional) parameter `limit`, so that the related route should now be s.th. like
+
+```
+GET    /jobs/:jobType    @de.kaufhof.hajobs.JobsController.list(jobType, limit: Int ?= 20)
+```
+
 ## Contents
 
 - [Overview](#overview)
@@ -304,7 +313,7 @@ In your routes file you have to add these routes (of course you may choose diffe
 
 
     POST   /jobs/:jobType           @de.kaufhof.hajobs.JobsController.run(jobType)
-    GET    /jobs/:jobType           @de.kaufhof.hajobs.JobsController.list(jobType)
+    GET    /jobs/:jobType           @de.kaufhof.hajobs.JobsController.list(jobType, limit: Int ?= 20)
     GET    /jobs/:jobType/latest    @de.kaufhof.hajobs.JobsController.latest(jobType)
     GET    /jobs/:jobType/:jobId    @de.kaufhof.hajobs.JobsController.status(jobType, jobId)
 

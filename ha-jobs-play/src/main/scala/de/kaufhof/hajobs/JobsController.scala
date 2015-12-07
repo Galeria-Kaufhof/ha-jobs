@@ -32,7 +32,7 @@ class JobsController(jobManager: JobManager,
    */
   def latest(jobTypeString: String): Action[AnyContent] = Action.async {
     jobTypes(jobTypeString).map { jobType =>
-      val jobStatusFuture: Future[List[JobStatus]] = jobManager.allJobStatus(jobType)
+      val jobStatusFuture: Future[List[JobStatus]] = jobManager.allJobStatus(jobType, limit = 1)
       jobStatusFuture.map(_.headOption).map {
         case Some(j: JobStatus) =>
           TemporaryRedirect(statusUrl(jobType, j.jobId))
@@ -59,9 +59,9 @@ class JobsController(jobManager: JobManager,
   /**
    * Returns the list of job executions for the given job type.
    */
-  def list(jobTypeString: String): Action[AnyContent] = Action.async {
+  def list(jobTypeString: String, limit: Int = 20): Action[AnyContent] = Action.async {
     jobTypes(jobTypeString).map { jobType =>
-      val jobStatusFuture: Future[List[JobStatus]] = jobManager.allJobStatus(jobType)
+      val jobStatusFuture: Future[List[JobStatus]] = jobManager.allJobStatus(jobType, limit)
       jobStatusFuture.map { jobs =>
         Ok(Json.obj("jobs" -> jobs, "latest" -> jobs.headOption.map(job => statusUrl(jobType, job.jobId))))
       }

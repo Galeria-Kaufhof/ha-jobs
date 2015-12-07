@@ -4,6 +4,7 @@ import java.util.UUID.randomUUID
 
 import org.joda.time.DateTime
 import org.mockito.Mockito._
+import org.mockito.Matchers.{eq => meq, anyInt}
 import org.scalatest._
 import org.scalatest.mock.MockitoSugar
 import play.api.http.MimeTypes
@@ -24,7 +25,7 @@ class JobsControllerSpec extends WordSpec with BeforeAndAfterEach with Matchers 
 
   override protected def beforeEach(): Unit = {
     reset(jobManager)
-    when(jobManager.allJobStatus(jobType1)).thenReturn(Future.successful(List.empty))
+    when(jobManager.allJobStatus(meq(jobType1), anyInt)).thenReturn(Future.successful(List.empty))
     when(jobManager.triggerJob(jobType1)).thenReturn(Future.successful(Started(randomUUID())))
   }
 
@@ -58,7 +59,7 @@ class JobsControllerSpec extends WordSpec with BeforeAndAfterEach with Matchers 
   "JobsController.latest" should {
     "return job status Location" in {
       val someId = randomUUID()
-      when(jobManager.allJobStatus(jobType1)).thenReturn(Future.successful(List(JobStatus(randomUUID(),
+      when(jobManager.allJobStatus(meq(jobType1), anyInt())).thenReturn(Future.successful(List(JobStatus(randomUUID(),
         jobType1,
         someId,
         JobState.Running,

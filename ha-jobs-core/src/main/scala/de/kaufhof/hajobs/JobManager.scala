@@ -151,7 +151,7 @@ class JobManager(managedJobs: => Jobs,
 
   def getJob(jobType: JobType): Job = managedJobs(jobType)
 
-  def allJobStatus(jobType: JobType): Future[List[JobStatus]] = jobStatusRepo.list(jobType)
+  def allJobStatus(jobType: JobType, limit: Int = 20): Future[List[JobStatus]] = jobStatusRepo.list(jobType, limit)
 
   def jobStatus(jobType: JobType, jobId: UUID): Future[Option[JobStatus]] = jobStatusRepo.get(jobType, jobId)
 
