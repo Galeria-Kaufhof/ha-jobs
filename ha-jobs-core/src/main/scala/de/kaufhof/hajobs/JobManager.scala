@@ -13,7 +13,6 @@ import org.quartz.simpl.{RAMJobStore, SimpleThreadPool}
 import org.slf4j.LoggerFactory.getLogger
 import play.api.libs.json.Json
 
-import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -132,7 +131,7 @@ class JobManager(managedJobs: => Jobs,
           logger.error(s"Error starting Job {} triggerId {}, set JobStatus to Failed! ", jobType, triggerId, e)
           retry(3) {
             jobStatusRepo.save(
-              JobStatus(triggerId, jobType, UUID.randomUUID(), JobState.Failed, JobResult.Failed, DateTime.now(), Some(Json.toJson(e.getMessage)))
+              JobStatus(triggerId, jobType, UUIDs.timeBased(), JobState.Failed, JobResult.Failed, DateTime.now(), Some(Json.toJson(e.getMessage)))
             )
           }.map(_ => Error(s"Error starting Job $jobType triggerId $triggerId, set JobStatus to Failed! Msg: ${e.getMessage}"))
             .recover {
