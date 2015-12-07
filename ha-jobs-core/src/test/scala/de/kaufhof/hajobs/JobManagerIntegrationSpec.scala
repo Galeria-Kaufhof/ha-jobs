@@ -29,7 +29,7 @@ class JobManagerIntegrationSpec extends CassandraSpec with DefaultAwaitTimeout w
       val mockedScheduler = mock[Scheduler]
 
       val manager = new JobManager(Seq(new Job1(jobStatusRepository, cdl), new Job12(jobStatusRepository)), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, false)
-      manager.triggerJob(JobType1)
+      await(manager.triggerJob(JobType1)) should be (a[Started])
 
       eventually {
         await(lockRepository.getIdForType(JobType1)) should be ('defined)
