@@ -129,7 +129,7 @@ class JobManager(managedJobs: => Jobs,
       .recoverWith {
         case NonFatal(e) =>
           logger.error(s"Error starting Job {} triggerId {}, set JobStatus to Failed! ", jobType, triggerId, e)
-          retry(3) {
+          retry(3, s"saveJobStartFailure(${job.jobType.name}/triggerId $triggerId)") {
             jobStatusRepo.save(
               JobStatus(triggerId, jobType, UUIDs.timeBased(), JobState.Failed, JobResult.Failed, DateTime.now(), Some(Json.toJson(e.getMessage)))
             )
@@ -153,16 +153,6 @@ class JobManager(managedJobs: => Jobs,
   def allJobStatus(jobType: JobType, limit: Int = 20): Future[List[JobStatus]] = jobStatusRepo.list(jobType, limit)
 
   def jobStatus(jobType: JobType, jobId: UUID): Future[Option[JobStatus]] = jobStatusRepo.get(jobType, jobId)
-
-  /**
-   * Tries function max n times.
-   */
-  private final def retry[T](n: Int)(fn: => Future[T]): Future[T] = {
-    fn.recoverWith {
-      case _ if n > 1 => retry(n - 1)(fn)
-      case NonFatal(e) => Future.failed[T](e)
-    }
-  }
 
 }
 

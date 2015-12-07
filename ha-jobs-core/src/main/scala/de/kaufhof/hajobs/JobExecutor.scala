@@ -90,35 +90,37 @@ class JobExecutor(lockRepo: LockRepository) extends Actor with ActorLogging {
   private def run(job: Job, triggerId: UUID, runningJobs: Map[UUID, Running]): Future[JobStartStatus] = {
     val jobId = UUIDs.timeBased()
 
-    lockRepo.acquireLock(job.jobType, jobId, job.lockTimeout).flatMap { haveLock =>
-      if (haveLock) {
-        
-        implicit val jobContext = JobContext(job.jobType, jobId, triggerId)
-        val lockKeeperName = job.jobType.name + "_LOCK"
+    retry(3, s"acquireLock(${job.jobType.name}/$jobId)") {
+      lockRepo.acquireLock(job.jobType, jobId, job.lockTimeout).flatMap { haveLock =>
+        if (haveLock) {
 
-        try {
-          val execution = job.run()
+          implicit val jobContext = JobContext(job.jobType, jobId, triggerId)
+          val lockKeeperName = job.jobType.name + "_LOCK"
 
-          val lockKeeper = context.actorOf(
-            KeepJobLockedActor.props(lockRepo, job.jobType, jobId, job.lockTimeout, () => self ! LostLock(jobContext)), lockKeeperName
-          )
+          try {
+            val execution = job.run()
 
-          Future.successful(Running(job, execution, Some(lockKeeper)))
-        } catch {
-          case e: InvalidActorNameException =>
-            logInvalidActorNameException(e, job, triggerId, runningJobs, lockKeeperName)
-            lockRepo.releaseLock(job.jobType, jobContext.jobId)
-            Future.failed(e)
-          case e: Throwable =>
-            log.error(e, "Error starting job {} / {}, releasing lock.", job.jobType.name, jobId)
-            lockRepo.releaseLock(job.jobType, jobContext.jobId)
-            Future.failed(e)
-        }
-      } else {
-        lockRepo.getIdForType(job.jobType).map { uuid =>
-          val id = uuid.map(id => Some(id)).getOrElse(None)
-          log.info("Could not run job {} because it's locked by id {}", job.jobType.name, id)
-          LockedStatus(id)
+            val lockKeeper = context.actorOf(
+              KeepJobLockedActor.props(lockRepo, job.jobType, jobId, job.lockTimeout, () => self ! LostLock(jobContext)), lockKeeperName
+            )
+
+            Future.successful(Running(job, execution, Some(lockKeeper)))
+          } catch {
+            case e: InvalidActorNameException =>
+              logInvalidActorNameException(e, job, triggerId, runningJobs, lockKeeperName)
+              lockRepo.releaseLock(job.jobType, jobContext.jobId)
+              Future.failed(e)
+            case e: Throwable =>
+              log.error(e, "Error starting job {} / {}, releasing lock.", job.jobType.name, jobId)
+              lockRepo.releaseLock(job.jobType, jobContext.jobId)
+              Future.failed(e)
+          }
+        } else {
+          lockRepo.getIdForType(job.jobType).map { uuid =>
+            val id = uuid.map(id => Some(id)).getOrElse(None)
+            log.info("Could not run job {} because it's locked by id {}", job.jobType.name, id)
+            LockedStatus(id)
+          }
         }
       }
     }

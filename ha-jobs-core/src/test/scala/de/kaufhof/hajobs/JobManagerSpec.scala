@@ -4,7 +4,6 @@ import akka.actor.{ActorNotFound, ActorSystem}
 import com.datastax.driver.core.utils.UUIDs
 import de.kaufhof.hajobs
 import de.kaufhof.hajobs.JobManagerSpec._
-import de.kaufhof.hajobs.JobResult
 import de.kaufhof.hajobs.testutils.MockInitializers
 import org.mockito.Matchers._
 import org.mockito.Mockito._
@@ -103,8 +102,8 @@ class JobManagerSpec extends StandardSpec {
       val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, false)
       a[RuntimeException] should be thrownBy(await(manager.retriggerJob(JobType1, UUIDs.timeBased())))
 
-      verify(lockRepository, times(1)).acquireLock(any(), any(), any())(any())
-      verify(lockRepository, times(1)).releaseLock(any(), any())(any())
+      verify(lockRepository, times(3)).acquireLock(any(), any(), any())(any())
+      verify(lockRepository, times(3)).releaseLock(any(), any())(any())
       an[ActorNotFound] shouldBe thrownBy(await(actorSystem.actorSelection(".*_LOCK").resolveOne()))
     }
 
@@ -129,7 +128,7 @@ class JobManagerSpec extends StandardSpec {
     "set job to failed if job failed on start" in {
       val mockedScheduler = mock[Scheduler]
       val job = new TestJob() {
-        override def run()(implicit context: JobContext): JobExecution = throw new RuntimeException("test exception")
+        override def run()(implicit context: JobContext): JobExecution = throw newTestException
       }
       var jobStatus: List[JobStatus] = Nil
       when(jobStatusRepository.save(any())(any())).thenAnswer(new Answer[Future[JobStatus]] {
