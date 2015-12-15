@@ -22,6 +22,7 @@ import scala.language.postfixOps
 
 /**
  * A JobManager is responsible for running jobs. It creates the infrastructure, checks locking  etc. for job running
+ *
  * @param managedJobs all the jobs the manager knows and may manage. Jobs are defined lazy, so that the jobs map can
  *                    contain jobs that themselves need the JobManager (allow cyclic dependencies)
  */
@@ -102,6 +103,7 @@ class JobManager(managedJobs: => Jobs,
 
   /**
    * Start a job
+   *
    * @param jobType JobType of the job to start
    * @return StartStatus, f.e. Started if job could be started or LockedStatus if job is already running
    */
@@ -128,17 +130,23 @@ class JobManager(managedJobs: => Jobs,
     (executor ? JobExecutor.Execute(job, triggerId)).mapTo[JobStartStatus]
       .recoverWith {
         case NonFatal(e) =>
-          logger.error(s"Error starting Job {} triggerId {}, set JobStatus to Failed! ", jobType, triggerId, e)
-          retry(3, s"saveJobStartFailure(${job.jobType.name}/triggerId $triggerId)") {
-            jobStatusRepo.save(
-              JobStatus(triggerId, jobType, UUIDs.timeBased(), JobState.Failed, JobResult.Failed, DateTime.now(), Some(Json.toJson(e.getMessage)))
-            )
-          }.map(_ => Error(s"Error starting Job $jobType triggerId $triggerId, set JobStatus to Failed! Msg: ${e.getMessage}"))
-            .recover {
-              case t =>
-                logger.error(s"Error while writing JobStatus for job {} triggerId {}", jobType, triggerId, t)
-                Error(s"Error starting Job $jobType triggerId $triggerId, setting JobStatus to Failed failed! Msg: ${e.getMessage} ${t.getMessage}")
-            }
+          // the jobsupervisor does not write a status, therefore we don't want to store Failed results
+          // and we don't log anything, because job lock acquisition also does retries and logs errors
+          if(jobType != JobTypes.JobSupervisor) {
+            logger.error(s"Error starting Job {} triggerId {}, set JobStatus to Failed! ", jobType, triggerId, e)
+            retry(3, s"saveJobStartFailure(${job.jobType.name}/triggerId $triggerId)") {
+              jobStatusRepo.save(
+                JobStatus(triggerId, jobType, UUIDs.timeBased(), JobState.Failed, JobResult.Failed, DateTime.now(), Some(Json.toJson(e.getMessage)))
+              )
+            }.map(_ => Error(s"Error starting Job $jobType triggerId $triggerId, set JobStatus to Failed! Msg: ${e.getMessage}"))
+              .recover {
+                case t =>
+                  logger.error(s"Error while writing JobStatus for job {} triggerId {}", jobType, triggerId, t)
+                  Error(s"Error starting Job $jobType triggerId $triggerId, setting JobStatus to Failed failed! Msg: ${e.getMessage} ${t.getMessage}")
+              }
+          } else {
+            Future.successful(Error(s"Error starting Job $jobType triggerId $triggerId. Msg: ${e.getMessage}"))
+          }
 
       }
   }
