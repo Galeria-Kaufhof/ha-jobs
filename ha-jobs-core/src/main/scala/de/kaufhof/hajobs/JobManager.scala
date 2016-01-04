@@ -126,7 +126,7 @@ class JobManager(managedJobs: => Jobs,
    */
   def retriggerJob(jobType: JobType, triggerId: UUID): Future[JobStartStatus] = {
     val job = managedJobs(jobType)
-    implicit val timeout = Timeout(5 seconds)
+    implicit val timeout = jobStartTimeout(jobType)
     (executor ? JobExecutor.Execute(job, triggerId)).mapTo[JobStartStatus]
       .recoverWith {
         case NonFatal(e) =>
@@ -150,6 +150,8 @@ class JobManager(managedJobs: => Jobs,
 
       }
   }
+
+  protected def jobStartTimeout(jobType: JobType): Timeout = Timeout(10 seconds)
 
   def cancelJob(jobType: JobType): Unit = {
     logger.info("Cancelling job for job type {}", jobType)
