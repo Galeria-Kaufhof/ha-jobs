@@ -87,7 +87,7 @@ class JobStatusRepository(session: Session,
   def getLatestMetadata(readwithQuorum: Boolean = false)(implicit ec: ExecutionContext): Future[List[JobStatus]] = {
 
     def getLatestMetadata(jobType: JobType): Future[Option[JobStatus]] = {
-      val selectMetadata = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name))
+      val selectMetadata = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name)).limit(1)
       if (readwithQuorum) {
         // setConsistencyLevel returns "this", we do not need to reassign
         selectMetadata.setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM)
@@ -99,6 +99,33 @@ class JobStatusRepository(session: Session,
 
     val results = jobTypes.all.toList.map(getLatestMetadata)
     Future.sequence(results).map(_.flatten)
+  }
+
+  /**
+   * Finds all job status entries for all jobs.
+   * Every JobState is loaded with a single select statement
+   * It is recommened to use partition keys if possible and avoid
+   * IN statement in WHERE clauses, therefore we prefer to execute
+   * more than one select statement
+   */
+  def getAllMetadata(readwithQuorum: Boolean = false)(implicit ec: ExecutionContext): Future[Map[JobType, List[JobStatus]]] = {
+    def getAllMetadata(jobType: JobType): Future[(JobType, List[JobStatus])] = {
+      import scala.collection.JavaConversions._
+      val selectMetadata = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name))
+      if (readwithQuorum) {
+        // setConsistencyLevel returns "this", we do not need to reassign
+        selectMetadata.setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM)
+      }
+      val resultSetFuture: ResultSetFuture = session.executeAsync(selectMetadata)
+      resultSetFuture.map(res => {
+        val jobStatusList: List[JobStatus] = res.all.toList.flatMap(row => rowToStatus(row, isMeta = true))
+        jobType -> jobStatusList
+      }
+      )
+    }
+
+    val results = jobTypes.all.toList.map(getAllMetadata)
+    Future.sequence(results).map(_.toMap)
   }
 
   /**
