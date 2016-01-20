@@ -34,7 +34,7 @@ class JobStatusRepositorySpec extends CassandraSpec {
       val jobStatus2: JobStatus = JobStatus(anyTriggerId, type1, UUIDs.timeBased(), Finished, JobResult.Success, DateTime.now)
 
       // when
-      await(Future.sequence((Seq(repo.save(jobStatus1), repo.save(jobStatus2)))))
+      await(Future.sequence(Seq(repo.save(jobStatus1), repo.save(jobStatus2))))
 
       // then
       eventually {
@@ -82,6 +82,28 @@ class JobStatusRepositorySpec extends CassandraSpec {
       }
     }
 
+    "return all JobStatus Metadata on getAllMetadata" in {
+      assume(await(repo.getMetadata(limitByJobType = _ => 10)).flatMap(_._2) === List.empty)
+      val jobId1: UUID = UUIDs.timeBased()
+      val jobId2: UUID = UUIDs.timeBased()
+      val jobId3: UUID = UUIDs.timeBased()
+      val jobId4: UUID = UUIDs.timeBased()
+      val jobStatus1: JobStatus = JobStatus(anyTriggerId, type1, jobId1, Failed, JobResult.Failed, DateTime.now, Some(Json.toJson("muhmuh1")))
+      val jobStatus2: JobStatus = JobStatus(anyTriggerId, type1, jobId2, Failed, JobResult.Failed, DateTime.now, Some(Json.toJson("muhmuh2")))
+      val jobStatus3: JobStatus = JobStatus(anyTriggerId, type2, jobId3, Failed, JobResult.Failed, DateTime.now, Some(Json.toJson("muhmuh3")))
+      val jobStatus4: JobStatus = JobStatus(anyTriggerId, type2, jobId4, Failed, JobResult.Failed, DateTime.now, Some(Json.toJson("muhmuh4")))
+
+      // when
+      await(Future.sequence(Seq(repo.save(jobStatus1), repo.save(jobStatus2), repo.save(jobStatus3), repo.save(jobStatus4))))
+
+      eventually {
+        val map = await(repo.getMetadata(limitByJobType = _ => 10))
+        map.size should be(2)
+        map.flatMap(_._2).size should be(4)
+        map.flatMap(_._2).map(_.jobId) should contain allOf(jobId1, jobId2, jobId3, jobId4)
+      }
+    }
+
     "update meta data and insert data on update" in {
       assume(await(repo.getLatestMetadata()) === List.empty)
       val jobId1: UUID = UUIDs.timeBased()
@@ -99,7 +121,7 @@ class JobStatusRepositorySpec extends CassandraSpec {
       }
 
       eventually {
-        await(repo.getJobHistory(type1, jobId1)).map(_.jobState) should contain theSameElementsAs (Seq(Canceled, Finished))
+        await(repo.getJobHistory(type1, jobId1)).map(_.jobState) should contain theSameElementsAs Seq(Canceled, Finished)
       }
     }
   }

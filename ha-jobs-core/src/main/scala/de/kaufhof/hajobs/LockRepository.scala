@@ -6,7 +6,6 @@ import com.datastax.driver.core.ConsistencyLevel.{LOCAL_QUORUM, LOCAL_SERIAL}
 import com.datastax.driver.core._
 import com.datastax.driver.core.querybuilder.QueryBuilder._
 import com.datastax.driver.core.querybuilder.{Insert, QueryBuilder}
-import de.kaufhof.hajobs.utils.CassandraUtils
 import de.kaufhof.hajobs.utils.CassandraUtils._
 import org.slf4j.LoggerFactory._
 

@@ -82,9 +82,10 @@ class JobSupervisor(jobManager: => JobManager,
    * @return
    */
   private[hajobs] def retriggerJobs(): Future[Seq[JobStartStatus]] = {
-    jobStatusRepository.getLatestMetadata().flatMap { allJobs =>
-      val a = allJobs.groupBy(_.jobType).flatMap { case (jobType, jobStatus) =>
-        triggerIdToRetrigger(jobType, jobStatus).map { triggerId =>
+    def retriggerCount: (JobType) => Int = jobManager.retriggerCounts.getOrElse(_, 10)
+    jobStatusRepository.getMetadata(limitByJobType = retriggerCount).flatMap { jobStatusMap =>
+      val a = jobStatusMap.flatMap { case (jobStatus, jobStatusList) =>
+        triggerIdToRetrigger(jobType, jobStatusList).map { triggerId =>
           logger.info(s"Retriggering job of type $jobType with triggerid $triggerId")
           jobManager.retriggerJob(jobType, triggerId)
         }
@@ -93,20 +94,24 @@ class JobSupervisor(jobManager: => JobManager,
     }
   }
 
-  private def triggerIdToRetrigger(jobType: JobType, jobStatus: List[JobStatus]): Option[UUID] = {
+  private def triggerIdToRetrigger(jobType: JobType, jobStatusList: List[JobStatus]): Option[UUID] = {
     val job = jobManager.getJob(jobType)
-    val latestTriggerId = jobStatus.sortBy(_.jobStatusTs.getMillis).last.triggerId
-    val jobsOfLatestTrigger = jobStatus.filter(_.triggerId == latestTriggerId)
+    val maybeLatestTriggerId = jobStatusList.sortBy(_.jobStatusTs.getMillis).lastOption.map(_.triggerId)
 
-    // we don't need to restart a job that already succeeded
-    // or thats pending, cause we don't know the reuslt of that job
-    val someJobIsRunningOrPending = jobsOfLatestTrigger.exists(js => js.jobResult == JobResult.Pending
-      || js.jobResult == JobResult.Success)
+    maybeLatestTriggerId flatMap { latestTriggerId =>
+        val jobsOfLatestTrigger = jobStatusList.filter(_.triggerId == latestTriggerId)
 
-    if (!someJobIsRunningOrPending && jobsOfLatestTrigger.size <= job.retriggerCount) {
-      Some(latestTriggerId)
-    } else {
-      None
+        // we don't need to restart a job that already succeeded
+        // or thats pending, cause we don't know the reuslt of that job
+        val someJobIsRunningOrPending = jobsOfLatestTrigger.exists(js => js.jobResult == JobResult.Pending
+          || js.jobResult == JobResult.Success)
+
+        if (!someJobIsRunningOrPending && jobsOfLatestTrigger.size <= job.retriggerCount) {
+          maybeLatestTriggerId
+        } else {
+          None
+        }
     }
+
   }
 }
