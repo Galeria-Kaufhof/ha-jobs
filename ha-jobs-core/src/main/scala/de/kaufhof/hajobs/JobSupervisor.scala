@@ -82,7 +82,8 @@ class JobSupervisor(jobManager: => JobManager,
    * @return
    */
   private[hajobs] def retriggerJobs(): Future[Seq[JobStartStatus]] = {
-    jobStatusRepository.getAllMetadata().flatMap { jobStatusMap =>
+    def retriggerCount: (JobType) => Int = jobManager.retriggerCounts.getOrElse(_, 10)
+    jobStatusRepository.getMetadata(limitByJobType = retriggerCount).flatMap { jobStatusMap =>
       val a = jobStatusMap.flatMap { case (jobStatus, jobStatusList) =>
         triggerIdToRetrigger(jobType, jobStatusList).map { triggerId =>
           logger.info(s"Retriggering job of type $jobType with triggerid $triggerId")

@@ -30,7 +30,7 @@ class JobSupervisorSpec extends StandardSpec {
     "change the state of failed jobs to FAILED" in {
       when(lockRepository.getAll()(any())).thenReturn(Future.successful(Seq.empty))
       val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(jobStatus)))
-      when(jobStatusRepository.getAllMetadata(anyBoolean())(any())).thenReturn(successful)
+      when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
       when(jobStatusRepository.updateJobState(any(), any())(any())).thenAnswer(futureIdentityAnswer())
       when(jobStatusRepository.get(any(), any(), anyBoolean())(any())).thenReturn(Future.successful(Some(jobStatusWithContent)))
 
@@ -46,7 +46,7 @@ class JobSupervisorSpec extends StandardSpec {
     "not change the state of still running jobs" in {
       when(lockRepository.getAll()(any())).thenReturn(Future.successful(Seq(Lock(jobStatus.jobType.lockType, jobStatus.jobId))))
       val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(jobStatus)))
-      when(jobStatusRepository.getAllMetadata(anyBoolean())(any())).thenReturn(successful)
+      when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
 
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
 
@@ -69,7 +69,7 @@ class JobSupervisorSpec extends StandardSpec {
 
     "do nothing if no JobStatus exist" in {
       val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> Nil))
-      when(jobStatusRepository.getAllMetadata(anyBoolean())(any())).thenReturn(successful)
+      when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
       await(sut.retriggerJobs())
       verify(jobManager, times(0)).retriggerJob(any(), any())
@@ -79,7 +79,7 @@ class JobSupervisorSpec extends StandardSpec {
       val job1 = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
       val job2 = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Finished, JobResult.Success, DateTime.now)
       val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(job1,job2)))
-      when(jobStatusRepository.getAllMetadata(anyBoolean())(any())).thenReturn(successful)
+      when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
       await(sut.retriggerJobs())
       verify(jobManager, times(0)).retriggerJob(any(), any())
@@ -88,7 +88,7 @@ class JobSupervisorSpec extends StandardSpec {
     "retrigger a job if no job of the last trigger was successful and retrigger size is not reached" in {
       val job1 = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
       val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(job1)))
-      when(jobStatusRepository.getAllMetadata(anyBoolean())(any())).thenReturn(successful)
+      when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
       await(sut.retriggerJobs())
       verify(jobManager, times(1)).retriggerJob(job1.jobType, job1.triggerId)
@@ -100,7 +100,7 @@ class JobSupervisorSpec extends StandardSpec {
       val job3 = job1.copy(jobStatusTs = DateTime.now.minusMillis(2), jobId = UUIDs.random())
       val job4 = job1.copy(jobStatusTs = DateTime.now.minusMillis(2), jobId = UUIDs.random())
       val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(job1, job2, job3, job4)))
-      when(jobStatusRepository.getAllMetadata(anyBoolean())(any())).thenReturn(successful)
+      when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
       await(sut.retriggerJobs())
       verify(jobManager, times(0)).retriggerJob(job1.jobType, job1.triggerId)

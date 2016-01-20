@@ -108,10 +108,10 @@ class JobStatusRepository(session: Session,
    * IN statement in WHERE clauses, therefore we prefer to execute
    * more than one select statement
    */
-  def getAllMetadata(readwithQuorum: Boolean = false)(implicit ec: ExecutionContext): Future[Map[JobType, List[JobStatus]]] = {
+  def getMetadata(readwithQuorum: Boolean = false, limitByJobType: JobType => Int)(implicit ec: ExecutionContext): Future[Map[JobType, List[JobStatus]]] = {
     def getAllMetadata(jobType: JobType): Future[(JobType, List[JobStatus])] = {
       import scala.collection.JavaConversions._
-      val selectMetadata = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name))
+      val selectMetadata = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name)).limit(limitByJobType(jobType))
       if (readwithQuorum) {
         // setConsistencyLevel returns "this", we do not need to reassign
         selectMetadata.setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM)

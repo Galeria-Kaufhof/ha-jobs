@@ -83,7 +83,7 @@ class JobStatusRepositorySpec extends CassandraSpec {
     }
 
     "return all JobStatus Metadata on getAllMetadata" in {
-      assume(await(repo.getAllMetadata()).flatMap(_._2) === List.empty)
+      assume(await(repo.getMetadata(limitByJobType = _ => 10)).flatMap(_._2) === List.empty)
       val jobId1: UUID = UUIDs.timeBased()
       val jobId2: UUID = UUIDs.timeBased()
       val jobId3: UUID = UUIDs.timeBased()
@@ -97,7 +97,7 @@ class JobStatusRepositorySpec extends CassandraSpec {
       await(Future.sequence(Seq(repo.save(jobStatus1), repo.save(jobStatus2), repo.save(jobStatus3), repo.save(jobStatus4))))
 
       eventually {
-        val map = await(repo.getAllMetadata())
+        val map = await(repo.getMetadata(limitByJobType = _ => 10))
         map.size should be(2)
         map.flatMap(_._2).size should be(4)
         map.flatMap(_._2).map(_.jobId) should contain allOf(jobId1, jobId2, jobId3, jobId4)

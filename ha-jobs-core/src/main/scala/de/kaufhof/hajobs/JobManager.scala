@@ -164,6 +164,10 @@ class JobManager(managedJobs: => Jobs,
 
   def jobStatus(jobType: JobType, jobId: UUID): Future[Option[JobStatus]] = jobStatusRepo.get(jobType, jobId)
 
+  private[hajobs] def retriggerCounts: Map[JobType, Int] = managedJobs.map { case (jobType, job) =>
+    jobType -> job.retriggerCount
+  }
+
 }
 
 object JobManager {
