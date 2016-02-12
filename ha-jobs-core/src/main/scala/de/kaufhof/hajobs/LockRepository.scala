@@ -154,8 +154,7 @@ class LockRepository(session: Session, lockTypes: LockTypes) {
       )
     }
 
-    val res = lockTypes.all.toList.map(getLock)
-    Future.sequence(res).map(_.flatten)
+    Future.traverse(lockTypes.all.toList){getLock}.map(_.flatten)
   }
 
   def clear(): Future[ResultSet] = {

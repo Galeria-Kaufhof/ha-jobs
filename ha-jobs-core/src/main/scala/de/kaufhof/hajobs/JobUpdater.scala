@@ -43,14 +43,14 @@ class JobUpdater(lockRepository: LockRepository, jobStatusRepository: JobStatusR
       Future.successful(List.empty)
     } else {
       logger.info("Detected dead jobs, changing state to DEAD for: {}", deadJobs.map(_.jobId).mkString(","))
-      val updateResults = deadJobs.map { jobMeta =>
+
+      Future.traverse(deadJobs){jobMeta =>
         jobStatusRepository.get(jobMeta.jobType, jobMeta.jobId).flatMap {
           case Some(data) => jobStatusRepository.updateJobState(data, JobState.Dead)
           // if no latest JobStatusData is found update JobStatusMeta instead
           case None => jobStatusRepository.updateJobState(jobMeta, JobState.Dead)
         }
       }
-      Future.sequence(updateResults)
     }
   }
 
