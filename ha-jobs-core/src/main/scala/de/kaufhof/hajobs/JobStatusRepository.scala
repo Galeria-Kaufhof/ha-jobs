@@ -97,8 +97,7 @@ class JobStatusRepository(session: Session,
       )
     }
 
-    val results = jobTypes.all.toList.map(getLatestMetadata)
-    Future.sequence(results).map(_.flatten)
+    Future.traverse(jobTypes.all.toList){ getLatestMetadata }.map(_.flatten)
   }
 
   /**
@@ -124,8 +123,7 @@ class JobStatusRepository(session: Session,
       )
     }
 
-    val results = jobTypes.all.toList.map(getAllMetadata)
-    Future.sequence(results).map(_.toMap)
+    Future.traverse(jobTypes.all.toList){getAllMetadata}.map(_.toMap)
   }
 
   /**
