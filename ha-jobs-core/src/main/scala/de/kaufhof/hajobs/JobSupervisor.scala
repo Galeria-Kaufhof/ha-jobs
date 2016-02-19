@@ -79,19 +79,23 @@ class JobSupervisor(jobManager: => JobManager,
   /**
    * Retrigger all failed jobs. A job is considered failed if for the latest trigger id there is no succeded job
    * and no job is running. Failed job can only be retriggered a limited number of times.
-   * @return
+    *
+    * @return
    */
   private[hajobs] def retriggerJobs(): Future[Seq[JobStartStatus]] = {
     def retriggerCount: (JobType) => Int = jobManager.retriggerCounts.getOrElse(_, 10)
-    jobStatusRepository.getMetadata(limitByJobType = retriggerCount).flatMap { jobStatusMap =>
-      val a = jobStatusMap.flatMap { case (jobStatus, jobStatusList) =>
-        triggerIdToRetrigger(jobType, jobStatusList).map { triggerId =>
-          logger.info(s"Retriggering job of type $jobType with triggerid $triggerId")
-          jobManager.retriggerJob(jobType, triggerId)
-        }
-      }.toSeq
-      Future.sequence(a)
-    }
+    def triggerIds(metadataList: List[(JobType, List[JobStatus])]): List[UUID] = for {
+      (jobType, jobStatusList) <- metadataList
+      triggerId <- triggerIdToRetrigger(jobType, jobStatusList)
+    } yield triggerId
+
+    for {
+      metadataList <- jobStatusRepository.getMetadata(limitByJobType = retriggerCount).map(_.toList)
+      triggerIdList = triggerIds(metadataList)
+      jobStartStatusList <- Future.traverse(triggerIdList) { triggerId =>
+        jobManager.retriggerJob(jobType, triggerId)
+      }
+    } yield jobStartStatusList
   }
 
   private def triggerIdToRetrigger(jobType: JobType, jobStatusList: List[JobStatus]): Option[UUID] = {

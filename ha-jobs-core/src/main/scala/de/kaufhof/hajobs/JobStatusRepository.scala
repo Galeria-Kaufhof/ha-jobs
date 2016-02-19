@@ -115,8 +115,7 @@ class JobStatusRepository(session: Session,
         // setConsistencyLevel returns "this", we do not need to reassign
         selectMetadata.setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM)
       }
-      val resultSetFuture: ResultSetFuture = session.executeAsync(selectMetadata)
-      resultSetFuture.map(res => {
+      session.executeAsync(selectMetadata).map(res => {
         val jobStatusList: List[JobStatus] = res.all.toList.flatMap(row => rowToStatus(row, isMeta = true))
         jobType -> jobStatusList
       }
@@ -143,8 +142,7 @@ class JobStatusRepository(session: Session,
       selectStmt.setConsistencyLevel(LOCAL_QUORUM)
     }
 
-    val resultFuture: ResultSetFuture = session.executeAsync(selectStmt)
-    resultFuture.map( res =>
+    session.executeAsync(selectStmt).map(res =>
       res.all.toList.flatMap( row =>
         rowToStatus(row, isMeta = false)
       ))
@@ -162,8 +160,7 @@ class JobStatusRepository(session: Session,
       selectStmt.setConsistencyLevel(LOCAL_QUORUM)
     }
 
-    val resultFuture: ResultSetFuture = session.executeAsync(selectStmt)
-    resultFuture.map ( res =>
+    session.executeAsync(selectStmt).map(res =>
       res.all().toList.flatMap( result =>
         rowToStatus(result, isMeta = true)
       ))
@@ -182,8 +179,7 @@ class JobStatusRepository(session: Session,
     }
 
 
-    val resultFuture: ResultSetFuture = session.executeAsync(selectStmt)
-    resultFuture.map( res =>
+    session.executeAsync(selectStmt).map(res =>
       Option(res.one).flatMap( result =>
         rowToStatus(result, isMeta = false)
       ))
@@ -234,11 +230,9 @@ class JobStatusRepository(session: Session,
   }
 
   def clear()(implicit ec: ExecutionContext): Future[Unit] = {
-    val metaResFuture = session.executeAsync(truncate(MetaTable))
-    val dataResFuture = session.executeAsync(truncate(DataTable))
     for(
-      meta <- metaResFuture;
-      data <- dataResFuture
+      meta <- session.executeAsync(truncate(MetaTable));
+      data <- session.executeAsync(truncate(DataTable))
     ) yield ()
   }
 }

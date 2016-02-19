@@ -37,5 +37,19 @@ class JobUpdaterSpec extends StandardSpec {
         verify(jobStatusRepository, times(1)).updateJobState(jobWithData, JobState.Dead)
       }
     }
+
+    "do nothing on empty dead job list" in {
+      reset(jobStatusRepository)
+      when(lockRepository.getAll()).thenReturn(Future.successful(Seq.empty))
+      when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(Future.successful(Map.empty[JobType, List[JobStatus]]))
+
+      val jobUpdater = new JobUpdater(lockRepository, jobStatusRepository)
+
+      await(jobUpdater.updateJobs())
+      eventually {
+        verify(jobStatusRepository, times(1)).getMetadata(true, limitByJobType = _ => 10)
+        verifyNoMoreInteractions(jobStatusRepository)
+      }
+    }
   }
 }

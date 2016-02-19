@@ -39,19 +39,14 @@ class JobUpdater(lockRepository: LockRepository, jobStatusRepository: JobStatusR
   }
 
   private[hajobs] def updateDeadJobState(deadJobs: List[JobStatus]): Future[List[JobStatus]] = {
-    if (deadJobs.isEmpty) {
-      Future.successful(List.empty)
-    } else {
-      logger.info("Detected dead jobs, changing state to DEAD for: {}", deadJobs.map(_.jobId).mkString(","))
-
-      Future.traverse(deadJobs){jobMeta =>
-        jobStatusRepository.get(jobMeta.jobType, jobMeta.jobId).flatMap {
+    Future.traverse(deadJobs) { jobMeta =>
+      logger.info("Detected dead job, changing state to DEAD for: {}", jobMeta.jobId)
+      jobStatusRepository.get(jobMeta.jobType, jobMeta.jobId).flatMap {
           case Some(data) => jobStatusRepository.updateJobState(data, JobState.Dead)
           // if no latest JobStatusData is found update JobStatusMeta instead
           case None => jobStatusRepository.updateJobState(jobMeta, JobState.Dead)
         }
       }
     }
-  }
 
 }
