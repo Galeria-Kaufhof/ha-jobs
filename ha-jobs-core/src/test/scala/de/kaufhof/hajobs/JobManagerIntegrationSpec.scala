@@ -21,7 +21,7 @@ class JobManagerIntegrationSpec extends CassandraSpec with DefaultAwaitTimeout w
   private lazy val actorSystem = ActorSystem("JobManagerIntegrationSpec")
 
   override protected def beforeEach(): Unit = await(lockRepository.clear())
-  override protected def afterAll(): Unit = actorSystem.shutdown()
+  override protected def afterAll(): Unit = actorSystem.terminate()
 
   "JobManager locking" should {
     "should prevent 2 jobs sharing the same LockType from running in parallel" in {

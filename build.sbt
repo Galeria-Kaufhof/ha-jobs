@@ -1,6 +1,6 @@
 import net.virtualvoid.sbt.graph.Plugin.graphSettings
 
-val projectVersion = "1.2.5"
+val projectVersion = "1.3.0"
 
 val projectSettings = Seq(
   description := "Run distributed, highly available (batch) jobs, with job locking and supervision.",
@@ -11,8 +11,8 @@ val projectSettings = Seq(
 )
 
 val buildSettings = Seq(
-  scalaVersion := "2.11.6",
-  crossScalaVersions := Seq("2.10.5", "2.11.6"),
+  scalaVersion := "2.11.7",
+  crossScalaVersions := Seq("2.10.6", "2.11.7"),
   scalacOptions ++= Seq("-language:reflectiveCalls", "-feature", "-deprecation"),
   // fork (tests) to free resources. otherwise c* sessions are collected and will OOME at some point
   fork := true
@@ -62,11 +62,11 @@ val publishSettings = Seq(
     </developers>
 )
 
-val playVersion = "2.3.7"
-val akkaVersion = "2.3.7"
-val scalatest = "org.scalatest" %% "scalatest" % "2.2.0" % "test"
-val mockito = "org.mockito" % "mockito-core" % "1.9.5" % "test"
-val playTest = "com.typesafe.play" %% "play-test" % "2.3.0" % "test"
+val playVersion = "2.4.6"
+val akkaVersion = "2.4.2"
+val scalatest = "org.scalatest" %% "scalatest" % "2.2.6" % "test"
+val mockito = "org.mockito" % "mockito-core" % "1.10.19" % "test"
+val playTest = "com.typesafe.play" %% "play-test" % playVersion % "test"
 
 lazy val core = project.in(file("ha-jobs-core"))
   .settings(name := "ha-jobs")
@@ -79,9 +79,9 @@ lazy val core = project.in(file("ha-jobs-core"))
     libraryDependencies ++= Seq(
       "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.4",
       "com.typesafe.play" %% "play-json" % playVersion exclude("com.typesafe.play", "play_" + scalaVersion.value.substring(0, 4)),
-      "joda-time" % "joda-time" % "2.6",
-      "org.slf4j" % "slf4j-api" % "1.7.9",
-      "org.quartz-scheduler" % "quartz" % "2.2.1",
+      "joda-time" % "joda-time" % "2.9.2",
+      "org.slf4j" % "slf4j-api" % "1.7.18",
+      "org.quartz-scheduler" % "quartz" % "2.2.2",
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
       playTest,

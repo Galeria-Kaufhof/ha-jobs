@@ -44,7 +44,7 @@ class JobManagerSpec extends StandardSpec {
 
   override def afterEach() {
     manager.shutdown()
-    actorSystem.shutdown()
+    actorSystem.terminate()
   }
 
   "JobManager scheduler" should {

@@ -50,7 +50,7 @@ object Ex2ScheduledActorJob extends App with TestCassandraConnection {
   val jobSupervisor = new JobSupervisor(manager, lockRepo, statusRepo, Some("0 * * * * ?"))
 
 
-  val manager: JobManager = new JobManager(Seq(productImporter, jobSupervisor), lockRepo, statusRepo, system)
+  lazy val manager: JobManager = new JobManager(Seq(productImporter, jobSupervisor), lockRepo, statusRepo, system)
 
   println("Sleeping")
   Thread.sleep(20000)
@@ -58,7 +58,7 @@ object Ex2ScheduledActorJob extends App with TestCassandraConnection {
 
   println("Stopping")
   manager.shutdown()
-  system.shutdown()
+  system.terminate()
   session.getCluster.close()
 
 }

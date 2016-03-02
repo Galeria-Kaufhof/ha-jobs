@@ -57,7 +57,7 @@ object Ex3InfinitActorJob extends App with TestCassandraConnection {
   val jobSupervisor = new JobSupervisor(manager, lockRepo, statusRepo, Some("0 * * * * ?"))
 
 
-  val manager: JobManager = new JobManager(Seq(queueConsumer, jobSupervisor), lockRepo, statusRepo, system)
+  lazy val manager: JobManager = new JobManager(Seq(queueConsumer, jobSupervisor), lockRepo, statusRepo, system)
 
   // manually trigger the job
   manager.triggerJob(ConsumerJobType) onComplete {
@@ -73,7 +73,7 @@ object Ex3InfinitActorJob extends App with TestCassandraConnection {
 
   println("Stopping")
   manager.shutdown()
-  system.shutdown()
+  system.terminate()
   session.getCluster.close()
 
 }
