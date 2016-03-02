@@ -29,19 +29,37 @@ val publishSettings = Seq(
   publishMavenStyle := true,
   publishArtifact in Test := false,
   pomIncludeRepository := { _ => false },
-  pomExtra := (
-    <scm>
-      <url>git@github.com:Galeria-Kaufhof/ha-jobs.git</url>
-      <connection>scm:git:git@github.com:Galeria-Kaufhof/ha-jobs.git</connection>
-    </scm>
+  pomExtra := <scm>
+    <url>git@github.com:Galeria-Kaufhof/ha-jobs.git</url>
+    <connection>scm:git:git@github.com:Galeria-Kaufhof/ha-jobs.git</connection>
+  </scm>
     <developers>
       <developer>
         <id>martin.grotzke</id>
         <name>Martin Grotzke</name>
         <url>https://github.com/magro</url>
       </developer>
+      <developer>
+        <id>lichtsprung</id>
+        <name>Robert Giacinto</name>
+        <url>https://github.com/lichtsprung</url>
+      </developer>
+      <developer>
+        <id>adelafogoros</id>
+        <name>Adela Fogoros</name>
+        <url>https://github.com/adelafogoros</url>
+      </developer>
+      <developer>
+        <id>muellenborn</id>
+        <name>Markus Müllenborn</name>
+        <url>https://github.com/muellenborn</url>
+      </developer>
+      <developer>
+        <id>MarcoPriebe</id>
+        <name>Marco Priebe</name>
+        <url>https://github.com/MarcoPriebe</url>
+      </developer>
     </developers>
-  )
 )
 
 val playVersion = "2.3.7"
