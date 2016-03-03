@@ -25,7 +25,7 @@ object JobStatusRepository {
     *
     * @return the maximum number of job statuses that are returned.
     */
-  def defaultLimitByJobType: JobType => Int = _ => 10
+  val defaultLimitByJobType: JobType => Int = _ => 10
 }
 
 /**
