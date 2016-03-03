@@ -47,7 +47,7 @@ class JobUpdaterSpec extends StandardSpec {
 
       await(jobUpdater.updateJobs())
       eventually {
-        verify(jobStatusRepository, times(1)).getMetadata(true, limitByJobType = _ => 10)
+        verify(jobStatusRepository, times(1)).getMetadata(true, limitByJobType = JobStatusRepository.defaultLimitByJobType)
         verifyNoMoreInteractions(jobStatusRepository)
       }
     }

@@ -63,8 +63,8 @@ val publishSettings = Seq(
 
 val playVersion = "2.4.6"
 val akkaVersion = "2.4.2"
-val scalatest = "org.scalatest" %% "scalatest" % "2.2.0" % "test"
-val mockito = "org.mockito" % "mockito-core" % "1.9.5" % "test"
+val scalatest = "org.scalatest" %% "scalatest" % "2.2.6" % "test"
+val mockito = "org.mockito" % "mockito-core" % "1.10.19" % "test"
 val playTest = "com.typesafe.play" %% "play-test" % playVersion % "test"
 
 lazy val core = project.in(file("ha-jobs-core"))

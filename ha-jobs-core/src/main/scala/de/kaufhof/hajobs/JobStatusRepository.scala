@@ -18,6 +18,16 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
+object JobStatusRepository {
+
+  /**
+    * Returns a default limit of 10 for any JobType.
+    *
+    * @return the maximum number of job statuses that are returned.
+    */
+  def defaultLimitByJobType: JobType => Int = _ => 10
+}
+
 /**
  * Repository to manage job status in the database.
  * Write and Read Methods can be called with Consitency Level LOCAL_QUORUM
@@ -107,7 +117,9 @@ class JobStatusRepository(session: Session,
    * IN statement in WHERE clauses, therefore we prefer to execute
    * more than one select statement
    */
-  def getMetadata(readwithQuorum: Boolean = false, limitByJobType: JobType => Int)(implicit ec: ExecutionContext): Future[Map[JobType, List[JobStatus]]] = {
+  def getMetadata(readwithQuorum: Boolean = false,
+                  limitByJobType: JobType => Int = JobStatusRepository.defaultLimitByJobType)
+                 (implicit ec: ExecutionContext): Future[Map[JobType, List[JobStatus]]] = {
     def getAllMetadata(jobType: JobType): Future[(JobType, List[JobStatus])] = {
       import scala.collection.JavaConversions._
       val selectMetadata = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name)).limit(limitByJobType(jobType))
