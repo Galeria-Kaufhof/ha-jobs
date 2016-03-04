@@ -13,7 +13,9 @@ import scala.concurrent.Future
  * @param lockRepository see which jobs actually have a lock
  * @param jobStatusRepository find all the jobStatus
  */
-class JobUpdater(lockRepository: LockRepository, jobStatusRepository: JobStatusRepository) {
+class JobUpdater(lockRepository: LockRepository,
+                 jobStatusRepository: JobStatusRepository,
+                 limitByJobType: JobType => Int = JobStatusRepository.defaultLimitByJobType) {
 
   private val logger = getLogger(getClass)
 
@@ -27,7 +29,7 @@ class JobUpdater(lockRepository: LockRepository, jobStatusRepository: JobStatusR
       // we also need to read with quorom to ensure we get the most current
       // (and consistent) data
       locks <- lockRepository.getAll()
-      jobs <- jobStatusRepository.getMetadata(readwithQuorum = true, limitByJobType = _ => 10)
+      jobs <- jobStatusRepository.getMetadata(readwithQuorum = true, limitByJobType = limitByJobType)
 
       runningJobs = jobs.flatMap(_._2).toList.filter(_.jobResult == JobResult.Pending)
       deadJobs = runningJobs.filterNot(job => locks.exists(_.jobId == job.jobId))

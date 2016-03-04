@@ -1,14 +1,14 @@
 # HA-Jobs
 
-[![Build Status](https://travis-ci.org/Galeria-Kaufhof/ha-jobs.png?branch=master)](https://travis-ci.org/Galeria-Kaufhof/ha-jobs)
+[![Build Status](https://travis-ci.org/Galeria-Kaufhof/ha-jobs.png?branch=play-2.4)](https://travis-ci.org/Galeria-Kaufhof/ha-jobs)
 
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
-## New in 1.2.0
+## New in 1.3.0
 
-While 1.2.0 being binary backwards compatible, the routes file of the Play! Module should be changed: the `list` action got a
-new (optional) parameter `limit`, so that the related route should now be s.th. like
+- Support for Play Framework 2.4.x
+- This version is dropping support for Scala 2.10 and requires Java 8 due to changes in Play that are not compatible with Java 7.
 
 ```
 GET    /jobs/:jobType    @de.kaufhof.hajobs.JobsController.list(jobType, limit: Int ?= 20)
@@ -317,7 +317,8 @@ In your routes file you have to add these routes (of course you may choose diffe
     GET    /jobs/:jobType/latest    @de.kaufhof.hajobs.JobsController.latest(jobType)
     GET    /jobs/:jobType/:jobId    @de.kaufhof.hajobs.JobsController.status(jobType, jobId)
 
-Use your preferred dependency injection mechanism to provide the managed `JobsController` to your `GlobalSettings`:
+Use your preferred dependency injection mechanism to provide the managed `JobsController` to your application. Either by
+adding a new module to your application.conf or to your `ApplicationLoader`s load function.
 
 ```scala
 val jobManager = ... // the JobManager
