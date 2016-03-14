@@ -122,7 +122,8 @@ class JobStatusRepository(session: Session,
                  (implicit ec: ExecutionContext): Future[Map[JobType, List[JobStatus]]] = {
     def getAllMetadata(jobType: JobType): Future[(JobType, List[JobStatus])] = {
       import scala.collection.JavaConversions._
-      val selectMetadata = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name)).limit(limitByJobType(jobType))
+      val queryLimit = Option(limitByJobType(jobType)).filter(_ > 0).getOrElse(JobStatusRepository.defaultLimitByJobType(jobType))
+      val selectMetadata = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name)).limit(queryLimit)
       if (readwithQuorum) {
         // setConsistencyLevel returns "this", we do not need to reassign
         selectMetadata.setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM)
