@@ -3,7 +3,7 @@ package de.kaufhof.hajobs.testutils
 import java.io.File
 import java.util.Date
 
-import com.chrisomeara.pillar._
+import de.kaufhof.pillar._
 import com.datastax.driver.core.Session
 
 object Pillar {
