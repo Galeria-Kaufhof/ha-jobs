@@ -5,7 +5,7 @@ import java.util.UUID
 import org.slf4j.LoggerFactory._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Promise, Future}
+import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
 /**
@@ -34,7 +34,6 @@ class JobSupervisor(jobManager: => JobManager,
     @volatile
     private var isCancelled = false
 
-    private val jobId = jobContext.jobId
     logger.info("Starting dead job detection...")
 
     private val promise = Promise[Unit]()
@@ -83,7 +82,7 @@ class JobSupervisor(jobManager: => JobManager,
     * @return
    */
   private[hajobs] def retriggerJobs(): Future[Seq[JobStartStatus]] = {
-    def retriggerCount: (JobType) => Int = jobManager.retriggerCounts.getOrElse(_, 10)
+    def retriggerCount: JobType => Int = jobType => jobManager.retriggerCounts.getOrElse(jobType, 10)
     def triggerIds(metadataList: List[(JobType, List[JobStatus])]): List[UUID] = for {
       (jobType, jobStatusList) <- metadataList
       triggerId <- triggerIdToRetrigger(jobType, jobStatusList)
