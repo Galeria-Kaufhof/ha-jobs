@@ -33,7 +33,7 @@ case class JobContext(jobType: JobType, jobId: UUID, triggerId: UUID)
  * For actor jobs you can just use the `ActorJob`.
  */
 abstract class Job(val jobType: JobType,
-                   val retriggerCount: Int,
+                   val retriggerCount: Int = 1,
                    val cronExpression: Option[String] = None,
                    val lockTimeout: FiniteDuration = 60 seconds) {
 

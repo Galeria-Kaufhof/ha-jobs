@@ -17,7 +17,7 @@ import scala.language.postfixOps
 class ActorJob(jobType: JobType,
                props: JobContext => Props,
                system: ActorSystem,
-               retriggerCount: Int = 0,
+               retriggerCount: Int = 1,
                cronExpression: Option[String] = None,
                lockTimeout: FiniteDuration = 60 seconds)
   extends Job(jobType, retriggerCount, cronExpression, lockTimeout) {
