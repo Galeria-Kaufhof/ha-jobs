@@ -213,7 +213,7 @@ class JobStatusRepository(session: Session,
             jobId,
             JobState.withName(row.getString(JobStateColumn)),
             JobResult.withName(row.getString(JobResultColumn)),
-            new DateTime(row.getDate(TimestampColumn).getTime),
+            new DateTime(row.getTimestamp(TimestampColumn)),
             if (!isMeta) {
               readContent(row)
             } else {
