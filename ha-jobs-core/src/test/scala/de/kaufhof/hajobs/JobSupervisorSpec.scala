@@ -56,6 +56,21 @@ class JobSupervisorSpec extends StandardSpec {
 
       verify(jobStatusRepository, times(0)).updateJobState(any[JobStatus], any())(any())
     }
+
+    "return error on Exception" in {
+      when(lockRepository.getAll()(any())).thenReturn(Future.successful(Seq(Lock(jobStatus.jobType.lockType, jobStatus.jobId))))
+      val failed: Future[Map[JobType, List[JobStatus]]] = Future.failed(new RuntimeException("error"))
+      when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(failed)
+
+      val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
+
+      implicit val context = JobContext(JobTypes.JobSupervisor, UUIDs.timeBased(), UUIDs.timeBased())
+      val jobExecution = sut.run()
+      val res = intercept[RuntimeException](await(jobExecution.result))
+
+      res.getMessage should be ("error")
+
+    }
   }
 
   "retrigger job in JobSupervisor" should {
@@ -70,8 +85,10 @@ class JobSupervisorSpec extends StandardSpec {
     "do nothing if no JobStatus exist" in {
       val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> Nil))
       when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
+      when(lockRepository.getAll()(any())).thenReturn(Future.successful(Seq.empty))
+      implicit val context = JobContext(JobTypes.JobSupervisor, UUIDs.timeBased(), UUIDs.timeBased())
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
-      await(sut.retriggerJobs())
+      await(sut.run().result)
       verify(jobManager, times(0)).retriggerJob(any(), any())
     }
 
@@ -80,8 +97,10 @@ class JobSupervisorSpec extends StandardSpec {
       val job2 = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Finished, JobResult.Success, DateTime.now)
       val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(job1,job2)))
       when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
+      when(lockRepository.getAll()(any())).thenReturn(Future.successful(Seq.empty))
+      implicit val context = JobContext(JobTypes.JobSupervisor, UUIDs.timeBased(), UUIDs.timeBased())
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
-      await(sut.retriggerJobs())
+      await(sut.run().result)
       verify(jobManager, times(0)).retriggerJob(any(), any())
     }
 
@@ -89,8 +108,10 @@ class JobSupervisorSpec extends StandardSpec {
       val job1 = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
       val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(job1)))
       when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
+      when(lockRepository.getAll()(any())).thenReturn(Future.successful(Seq.empty))
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
-      await(sut.retriggerJobs())
+      implicit val context = JobContext(JobTypes.JobSupervisor, UUIDs.timeBased(), UUIDs.timeBased())
+      await(sut.run().result)
       verify(jobManager, times(1)).retriggerJob(job1.jobType, job1.triggerId)
     }
 
@@ -101,8 +122,10 @@ class JobSupervisorSpec extends StandardSpec {
       val job4 = job1.copy(jobStatusTs = DateTime.now.minusMillis(2), jobId = UUIDs.random())
       val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(job1, job2, job3, job4)))
       when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
+      when(lockRepository.getAll()(any())).thenReturn(Future.successful(Seq.empty))
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
-      await(sut.retriggerJobs())
+      implicit val context = JobContext(JobTypes.JobSupervisor, UUIDs.timeBased(), UUIDs.timeBased())
+      await(sut.run().result)
       verify(jobManager, times(0)).retriggerJob(job1.jobType, job1.triggerId)
     }
   }
