@@ -5,10 +5,10 @@
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
-## New in 1.3.0
+## New in 1.5.0
 
-- Support for Play Framework 2.4.x
-- This version is dropping support for Scala 2.10 and requires Java 8 due to changes in Play that are not compatible with Java 7.
+- upgrade cassandra driver and pillar to version 3.0.0
+- refactoring of JobSupervisor to avoid upcoming exceptions which lead to incomplete futures
 
 ```
 GET    /jobs/:jobType    @de.kaufhof.hajobs.JobsController.list(jobType, limit: Int ?= 20)
