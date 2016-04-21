@@ -3,7 +3,7 @@ package de.kaufhof.hajobs
 import java.util.UUID
 
 import com.datastax.driver.core.ConsistencyLevel.LOCAL_QUORUM
-import com.datastax.driver.core.querybuilder.QueryBuilder
+import com.datastax.driver.core.querybuilder.{Select, QueryBuilder}
 import com.datastax.driver.core.querybuilder.QueryBuilder._
 import de.kaufhof.hajobs.utils.CassandraUtils
 import CassandraUtils._
@@ -122,19 +122,29 @@ class JobStatusRepository(session: Session,
                  (implicit ec: ExecutionContext): Future[Map[JobType, List[JobStatus]]] = {
     def getAllMetadata(jobType: JobType): Future[(JobType, List[JobStatus])] = {
       import scala.collection.JavaConversions._
-      val queryLimit = Option(limitByJobType(jobType)).filter(_ > 0).getOrElse(JobStatusRepository.defaultLimitByJobType(jobType))
-      val selectMetadata = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name)).limit(queryLimit)
-      if (readwithQuorum) {
-        // setConsistencyLevel returns "this", we do not need to reassign
-        selectMetadata.setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM)
-      }
-      session.executeAsync(selectMetadata).map(res => {
-        val jobStatusList: List[JobStatus] = res.all.toList.flatMap(row => rowToStatus(row, isMeta = true))
-        jobType -> jobStatusList
-      }
-      )
-    }
 
+      def selectStmt: Select = {
+        val queryLimit = Option(limitByJobType(jobType)).filter(_ > 0).getOrElse(JobStatusRepository.defaultLimitByJobType(jobType))
+        val selectMetadata = select().all().from(MetaTable).where(QueryBuilder.eq(JobTypeColumn, jobType.name)).limit(queryLimit)
+        if (readwithQuorum) {
+          // setConsistencyLevel returns "this", we do not need to reassign
+          selectMetadata.setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM)
+        }
+        selectMetadata
+      }
+
+      for {
+        selectMetadata <- Future {
+          selectStmt
+        }
+        metadata <- session.executeAsync(selectMetadata).map(res => {
+          val jobStatusList: List[JobStatus] = res.all.toList.flatMap(row => rowToStatus(row, isMeta = true))
+          jobType -> jobStatusList
+        })
+      } yield {
+        metadata
+      }
+    }
     Future.traverse(jobTypes.all.toList){getAllMetadata}.map(_.toMap)
   }
 
