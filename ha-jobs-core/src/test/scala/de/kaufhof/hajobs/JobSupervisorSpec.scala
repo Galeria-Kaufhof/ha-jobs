@@ -105,8 +105,9 @@ class JobSupervisorSpec extends StandardSpec {
     }
 
     "retrigger a job if no job of the last trigger was successful and retrigger size is not reached" in {
-      val job1 = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
-      val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(job1)))
+      val jobTypeDummy: JobType = JobType("dummy", LockType("dummy"))
+      val job1 = JobStatus(UUIDs.timeBased(), jobTypeDummy, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
+      val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(jobTypeDummy -> List(job1)))
       when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
       when(lockRepository.getAll()(any())).thenReturn(Future.successful(Seq.empty))
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)
@@ -116,11 +117,12 @@ class JobSupervisorSpec extends StandardSpec {
     }
 
     "do nothing if no job of the last trigger was successful and retrigger size is reached" in {
-      val job1 = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Failed, JobResult.Failed, DateTime.now.minusMillis(0))
+      val jobTypeDummy: JobType = JobType("dummy", LockType("dummy"))
+      val job1 = JobStatus(UUIDs.timeBased(), jobTypeDummy, UUIDs.timeBased(), JobState.Failed, JobResult.Failed, DateTime.now.minusMillis(0))
       val job2 = job1.copy(jobStatusTs = DateTime.now.minusMillis(1), jobId = UUIDs.random())
       val job3 = job1.copy(jobStatusTs = DateTime.now.minusMillis(2), jobId = UUIDs.random())
       val job4 = job1.copy(jobStatusTs = DateTime.now.minusMillis(2), jobId = UUIDs.random())
-      val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(job1, job2, job3, job4)))
+      val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(jobTypeDummy -> List(job1, job2, job3, job4)))
       when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
       when(lockRepository.getAll()(any())).thenReturn(Future.successful(Seq.empty))
       val sut = new JobSupervisor(jobManager, lockRepository, jobStatusRepository)

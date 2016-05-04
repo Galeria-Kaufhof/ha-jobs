@@ -76,16 +76,16 @@ class JobSupervisor(jobManager: => JobManager,
    */
   private[hajobs] def retriggerJobs(): Future[Seq[JobStartStatus]] = {
     def retriggerCount: JobType => Int = jobType => jobManager.retriggerCounts.getOrElse(jobType, 10)
-    def triggerIds(metadataList: List[(JobType, List[JobStatus])]): List[UUID] = for {
+    def triggerIds(metadataList: List[(JobType, List[JobStatus])]): List[(JobType, UUID)] = for {
       (jobType, jobStatusList) <- metadataList
       triggerId <- triggerIdToRetrigger(jobType, jobStatusList)
-    } yield triggerId
+    } yield jobType -> triggerId
 
     for {
       metadataList <- jobStatusRepository.getMetadata(limitByJobType = retriggerCount).map(_.toList)
       triggerIdList = triggerIds(metadataList)
-      jobStartStatusList <- Future.traverse(triggerIdList) { triggerId =>
-        jobManager.retriggerJob(jobType, triggerId)
+      jobStartStatusList <- Future.traverse(triggerIdList) { case (jobTypeToRetrigger, triggerId) =>
+        jobManager.retriggerJob(jobTypeToRetrigger, triggerId)
       }
     } yield jobStartStatusList
   }

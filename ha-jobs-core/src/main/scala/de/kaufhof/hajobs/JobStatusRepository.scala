@@ -134,9 +134,7 @@ class JobStatusRepository(session: Session,
       }
 
       for {
-        selectMetadata <- Future {
-          selectStmt
-        }
+        selectMetadata <- Future(selectStmt)
         metadata <- session.executeAsync(selectMetadata).map(res => {
           val jobStatusList: List[JobStatus] = res.all.toList.flatMap(row => rowToStatus(row, isMeta = true))
           jobType -> jobStatusList
