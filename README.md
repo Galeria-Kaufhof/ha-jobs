@@ -1,6 +1,6 @@
 # HA-Jobs
 
-[![Build Status](https://travis-ci.org/Galeria-Kaufhof/ha-jobs.png?branch=play-2.4)](https://travis-ci.org/Galeria-Kaufhof/ha-jobs)
+[![Build Status](https://travis-ci.org/Galeria-Kaufhof/ha-jobs.png?branch=master)](https://travis-ci.org/Galeria-Kaufhof/ha-jobs)
 
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
