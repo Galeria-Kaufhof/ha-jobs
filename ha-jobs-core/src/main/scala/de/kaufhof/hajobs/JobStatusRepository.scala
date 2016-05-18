@@ -122,6 +122,8 @@ class JobStatusRepository(session: Session,
                  (implicit ec: ExecutionContext): Future[Map[JobType, List[JobStatus]]] = {
     def getAllMetadata(jobType: JobType): Future[(JobType, List[JobStatus])] = {
       import scala.collection.JavaConversions._
+      implicit def dateTimeOrdering: Ordering[DateTime] = Ordering.fromLessThan(_ isAfter _)
+
 
       def selectStmt: Select = {
         val queryLimit = Option(limitByJobType(jobType)).filter(_ > 0).getOrElse(JobStatusRepository.defaultLimitByJobType(jobType))
@@ -136,7 +138,8 @@ class JobStatusRepository(session: Session,
       for {
         selectMetadata <- Future(selectStmt)
         metadata <- session.executeAsync(selectMetadata).map(res => {
-          val jobStatusList: List[JobStatus] = res.all.toList.flatMap(row => rowToStatus(row, isMeta = true))
+          val jobStatusList: List[JobStatus] =
+            res.all.toList.flatMap(row => rowToStatus(row, isMeta = true)).sortBy(_.jobStatusTs)
           jobType -> jobStatusList
         })
       } yield {

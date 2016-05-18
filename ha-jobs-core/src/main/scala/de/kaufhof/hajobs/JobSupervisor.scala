@@ -75,14 +75,15 @@ class JobSupervisor(jobManager: => JobManager,
     * @return
    */
   private[hajobs] def retriggerJobs(): Future[Seq[JobStartStatus]] = {
-    def retriggerCount: JobType => Int = jobType => jobManager.retriggerCounts.getOrElse(jobType, 10)
+    // we need to see more job status entries than the retrigger count of each job
+    def limitByJobType: JobType => Int = retriggerJobType => jobManager.retriggerCounts.getOrElse(retriggerJobType, 10) * 2
     def triggerIds(metadataList: List[(JobType, List[JobStatus])]): List[(JobType, UUID)] = for {
-      (jobType, jobStatusList) <- metadataList
-      triggerId <- triggerIdToRetrigger(jobType, jobStatusList)
-    } yield jobType -> triggerId
+      (jobTypeToRetrigger, jobStatusList) <- metadataList
+      triggerId <- triggerIdToRetrigger(jobTypeToRetrigger, jobStatusList)
+    } yield jobTypeToRetrigger -> triggerId
 
     for {
-      metadataList <- jobStatusRepository.getMetadata(limitByJobType = retriggerCount).map(_.toList)
+      metadataList <- jobStatusRepository.getMetadata(limitByJobType = limitByJobType).map(_.toList)
       triggerIdList = triggerIds(metadataList)
       jobStartStatusList <- Future.traverse(triggerIdList) { case (jobTypeToRetrigger, triggerId) =>
         jobManager.retriggerJob(jobTypeToRetrigger, triggerId)
@@ -90,8 +91,8 @@ class JobSupervisor(jobManager: => JobManager,
     } yield jobStartStatusList
   }
 
-  private def triggerIdToRetrigger(jobType: JobType, jobStatusList: List[JobStatus]): Option[UUID] = {
-    val job = jobManager.getJob(jobType)
+  private def triggerIdToRetrigger(jobTypeToRetrigger: JobType, jobStatusList: List[JobStatus]): Option[UUID] = {
+    val job = jobManager.getJob(jobTypeToRetrigger)
     val maybeLatestTriggerId = jobStatusList.sortBy(_.jobStatusTs.getMillis).lastOption.map(_.triggerId)
 
     maybeLatestTriggerId flatMap { latestTriggerId =>

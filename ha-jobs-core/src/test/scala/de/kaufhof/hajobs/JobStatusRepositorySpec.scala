@@ -82,25 +82,29 @@ class JobStatusRepositorySpec extends CassandraSpec {
       }
     }
 
-    "return all JobStatus Metadata on getAllMetadata" in {
+    "return all latest JobStatus Metadata on getAllMetadata" in {
       assume(await(repo.getMetadata(limitByJobType = _ => 10)).flatMap(_._2) === List.empty)
-      val jobId1: UUID = UUIDs.timeBased()
-      val jobId2: UUID = UUIDs.timeBased()
-      val jobId3: UUID = UUIDs.timeBased()
-      val jobId4: UUID = UUIDs.timeBased()
-      val jobStatus1: JobStatus = JobStatus(anyTriggerId, type1, jobId1, Failed, JobResult.Failed, DateTime.now, Some(Json.toJson("muhmuh1")))
-      val jobStatus2: JobStatus = JobStatus(anyTriggerId, type1, jobId2, Failed, JobResult.Failed, DateTime.now, Some(Json.toJson("muhmuh2")))
-      val jobStatus3: JobStatus = JobStatus(anyTriggerId, type2, jobId3, Failed, JobResult.Failed, DateTime.now, Some(Json.toJson("muhmuh3")))
-      val jobStatus4: JobStatus = JobStatus(anyTriggerId, type2, jobId4, Failed, JobResult.Failed, DateTime.now, Some(Json.toJson("muhmuh4")))
+      val jobId1: UUID = UUIDs.startOf(DateTime.now.minusMillis(5000).getMillis)
+      val jobId2: UUID = UUIDs.startOf(DateTime.now.minusMillis(3000).getMillis)
+      val jobId3: UUID = UUIDs.startOf(DateTime.now.minusMillis(1000).getMillis)
+      val jobId4: UUID = UUIDs.startOf(DateTime.now.minusMillis(1000).getMillis)
+      val jobId5: UUID = UUIDs.startOf(DateTime.now.minusMillis(0).getMillis)
+      val jobId6: UUID = UUIDs.startOf(DateTime.now.minusMillis(2000).getMillis)
+      val jobStatus1: JobStatus = JobStatus(anyTriggerId, type1, jobId1, Failed, JobResult.Failed, DateTime.now.minusMillis(5000), Some(Json.toJson("muhmuh1")))
+      val jobStatus2: JobStatus = JobStatus(anyTriggerId, type1, jobId2, Failed, JobResult.Failed, DateTime.now.minusMillis(1000), Some(Json.toJson("muhmuh2")))
+      val jobStatus3: JobStatus = JobStatus(anyTriggerId, type1, jobId3, Failed, JobResult.Failed, DateTime.now.minusMillis(3000), Some(Json.toJson("muhmuh3")))
+      val jobStatus4: JobStatus = JobStatus(anyTriggerId, type2, jobId4, Failed, JobResult.Failed, DateTime.now.minusMillis(0), Some(Json.toJson("muhmuh4")))
+      val jobStatus5: JobStatus = JobStatus(anyTriggerId, type2, jobId5, Failed, JobResult.Failed, DateTime.now.minusMillis(1000), Some(Json.toJson("muhmuh5")))
+      val jobStatus6: JobStatus = JobStatus(anyTriggerId, type2, jobId6, Failed, JobResult.Failed, DateTime.now.minusMillis(2000), Some(Json.toJson("muhmuh6")))
 
       // when
-      await(Future.sequence(Seq(repo.save(jobStatus1), repo.save(jobStatus2), repo.save(jobStatus3), repo.save(jobStatus4))))
+      await(Future.sequence(Seq(repo.save(jobStatus1), repo.save(jobStatus2), repo.save(jobStatus3), repo.save(jobStatus4), repo.save(jobStatus5), repo.save(jobStatus6))))
 
       eventually {
-        val map = await(repo.getMetadata(limitByJobType = _ => 10))
+        val map = await(repo.getMetadata(limitByJobType = _ => 2))
         map.size should be(2)
         map.flatMap(_._2).size should be(4)
-        map.flatMap(_._2).map(_.jobId) should contain allOf(jobId1, jobId2, jobId3, jobId4)
+        map.flatMap(_._2).map(_.jobId).toList should contain theSameElementsInOrderAs List(jobId2, jobId3, jobId4, jobId5)
       }
     }
 
