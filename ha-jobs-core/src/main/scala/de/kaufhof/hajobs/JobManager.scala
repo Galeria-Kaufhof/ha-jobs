@@ -124,9 +124,9 @@ class JobManager(managedJobs: => Jobs,
   }
 
   /**
-    * Future that is redeemed with true when all jobs are successfully finished.
-    * If no jobs are scheduled for some reason, the value will be false and the future
-    * will possibly be failed with an exception.
+    * Future that is redeemed with true when all jobs are successfully scheduled.
+    * If not all jobs are scheduled for some reason, the value will be false (job scheduling deactivated)
+    * or the future will be failed with an exception.
     */
   def allJobsScheduled: Future[Boolean] = allJobsScheduledPromise.future
 
