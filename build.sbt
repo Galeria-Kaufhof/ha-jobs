@@ -1,5 +1,3 @@
-import net.virtualvoid.sbt.graph.Plugin.graphSettings
-
 val projectVersion = "1.5.2"
 
 val projectSettings = Seq(
@@ -73,7 +71,6 @@ lazy val core = project.in(file("ha-jobs-core"))
   .settings(projectSettings: _*)
   .settings(buildSettings: _*)
   .settings(publishSettings: _*)
-  .settings(graphSettings: _*)
   .settings(
     resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
     libraryDependencies ++= Seq(
@@ -100,7 +97,6 @@ lazy val play = project.in(file("ha-jobs-play"))
   .settings(projectSettings: _*)
   .settings(buildSettings: _*)
   .settings(publishSettings: _*)
-  .settings(graphSettings: _*)
   .settings(
     resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
     libraryDependencies ++= Seq(
