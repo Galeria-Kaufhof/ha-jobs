@@ -15,10 +15,11 @@ import play.api.libs.json.Json
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.language.postfixOps
+import scala.util.{Failure, Success}
 
 /**
  * A JobManager is responsible for running jobs. It creates the infrastructure, checks locking  etc. for job running
@@ -44,16 +45,34 @@ class JobManager(managedJobs: => Jobs,
 
   private val executor = actorSystem.actorOf(JobExecutor.props(lockRepo), "JobExecutor")
 
+  private val allJobsScheduledPromise = Promise[Boolean]
+
   init()
 
   protected def init(): Unit = {
     if (enableJobScheduling) {
-      logger.debug("JobManager: Starting scheduler")
-      scheduler.start
-      scheduleJobs
+      ensureJobPreconditions().andThen {
+        case Success(_) =>
+          logger.debug("JobManager: Starting scheduler")
+          scheduler.start()
+          scheduleJobs
+        case Failure(e) =>
+          logger.error("Job preconditions failed with exception, will not schedule jobs!", e)
+          allJobsScheduledPromise.failure(e)
+      }
     } else {
       logger.warn("CRON JOBS ARE GLOBALLY DISABLED via config, will not schedule jobs!")
+      allJobsScheduledPromise.success(false)
     }
+  }
+
+  /**
+    * Can be overridden in subclasses if something has to be done before any job can be started,
+    * e.g. checking that all caches are initialized completely.
+    * By default, just returns Future.sucessful.
+    */
+  protected def ensureJobPreconditions(): Future[_] = {
+    Future.successful(())
   }
 
   def shutdown(): Unit = {
@@ -66,40 +85,50 @@ class JobManager(managedJobs: => Jobs,
   protected def scheduleJob(jobToSchedule: Job) = {
     val jobType = jobToSchedule.jobType
     try {
-      jobToSchedule.cronExpression.map { cronExpression =>
-        logger.debug("scheduling job for {}", jobType)
-        val job = JobBuilder
-          .newJob(classOf[TriggerPuller])
-          .usingJobData(TPData(jobType, this).asDataMap)
-          .build()
+      jobToSchedule.cronExpression match {
+        case Some(cronExpression) =>
+          logger.debug("scheduling job for {}", jobType)
+          val job = JobBuilder
+            .newJob(classOf[TriggerPuller])
+            .usingJobData(TPData(jobType, this).asDataMap)
+            .build()
 
-        val jobName = jobType.name
+          val jobName = jobType.name
 
-        val trigger = TriggerBuilder
-          .newTrigger
-          .withIdentity(s"$jobName-trigger")
-          .withSchedule(CronScheduleBuilder
-          // this will throw an exception if the expression is incorrect
-          .cronSchedule(cronExpression)
-            .inTimeZone(schedulesTimeZone)
-          ).build()
+          val trigger = TriggerBuilder
+            .newTrigger
+            .withIdentity(s"$jobName-trigger")
+            .withSchedule(CronScheduleBuilder
+            // this will throw an exception if the expression is incorrect
+            .cronSchedule(cronExpression)
+              .inTimeZone(schedulesTimeZone)
+            ).build()
 
-        scheduler.scheduleJob(job, trigger)
+          scheduler.scheduleJob(job, trigger)
 
-        logger.info("Job '{}' has cron expression '{}', first execution at {}", jobType, trigger.getCronExpression, trigger.getNextFireTime)
-      }.getOrElse(
+          logger.info("Job '{}' has cron expression '{}', first execution at {}", jobType, trigger.getCronExpression, trigger.getNextFireTime)
+        case None =>
           logger.info("No cronExpression defined for job {}", jobType)
-        )
+      }
     } catch {
       case NonFatal(e) =>
         logger.error(s"Could not start scheduler for job type $jobType", e)
+        allJobsScheduledPromise.failure(e)
         throw e
     }
   }
 
   protected def scheduleJobs: Unit = {
     managedJobs.values.foreach(scheduleJob)
+    allJobsScheduledPromise.success(true)
   }
+
+  /**
+    * Future that is redeemed with true when all jobs are successfully scheduled.
+    * If not all jobs are scheduled for some reason, the value will be false (job scheduling deactivated)
+    * or the future will be failed with an exception.
+    */
+  def allJobsScheduled: Future[Boolean] = allJobsScheduledPromise.future
 
   /**
    * Start a job

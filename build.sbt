@@ -1,5 +1,3 @@
-import net.virtualvoid.sbt.graph.Plugin.graphSettings
-
 val projectVersion = "1.5.2"
 
 val projectSettings = Seq(
@@ -73,11 +71,10 @@ lazy val core = project.in(file("ha-jobs-core"))
   .settings(projectSettings: _*)
   .settings(buildSettings: _*)
   .settings(publishSettings: _*)
-  .settings(graphSettings: _*)
   .settings(
     resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
     libraryDependencies ++= Seq(
-      "com.datastax.cassandra" % "cassandra-driver-core" % "3.0.0",
+      "com.datastax.cassandra" % "cassandra-driver-core" % "3.0.2",
       "com.typesafe.play" %% "play-json" % playVersion exclude("com.typesafe.play", "play_" + scalaVersion.value.substring(0, 4)),
       "joda-time" % "joda-time" % "2.9.2",
       "org.slf4j" % "slf4j-api" % "1.7.18",
@@ -100,7 +97,6 @@ lazy val play = project.in(file("ha-jobs-play"))
   .settings(projectSettings: _*)
   .settings(buildSettings: _*)
   .settings(publishSettings: _*)
-  .settings(graphSettings: _*)
   .settings(
     resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
     libraryDependencies ++= Seq(

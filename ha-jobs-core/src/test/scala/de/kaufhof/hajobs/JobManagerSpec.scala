@@ -52,6 +52,7 @@ class JobManagerSpec extends StandardSpec {
       val job = spy(new TestJob(Some("* * * * * ?")))
 
       manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem)
+      await(manager.allJobsScheduled)
 
       eventually(Timeout(scaled(3 seconds))) {
         verify(job, atLeastOnce()).run()(any[JobContext])
@@ -63,6 +64,7 @@ class JobManagerSpec extends StandardSpec {
       val job = new TestJob(cronExpression = None)
 
       val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, true)
+      await(manager.allJobsScheduled)
       verify(mockedScheduler, times(1)).start()
       verifyNoMoreInteractions(mockedScheduler)
     }
@@ -73,6 +75,7 @@ class JobManagerSpec extends StandardSpec {
 
       val jobUpdater = new JobUpdater(lockRepository, jobStatusRepository)
       val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, false)
+      await(manager.allJobsScheduled)
       verifyNoMoreInteractions(mockedScheduler)
     }
   }
@@ -82,6 +85,7 @@ class JobManagerSpec extends StandardSpec {
       val job = new TestJob()
 
       val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, enableJobScheduling = false)
+      await(manager.allJobsScheduled)
       await(manager.retriggerJob(JobType1, UUIDs.timeBased()))
 
       verify(lockRepository, times(1)).acquireLock(any(), any(), any())(any())
@@ -100,6 +104,7 @@ class JobManagerSpec extends StandardSpec {
       when(job.run()(any())).thenThrow(newTestException)
 
       val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, false)
+      await(manager.allJobsScheduled)
       a[RuntimeException] should be thrownBy(await(manager.retriggerJob(JobType1, UUIDs.timeBased())))
 
       verify(lockRepository, times(3)).acquireLock(any(), any(), any())(any())
@@ -117,6 +122,7 @@ class JobManagerSpec extends StandardSpec {
       }
 
       val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, false)
+      await(manager.allJobsScheduled)
       await(manager.retriggerJob(JobType1, UUIDs.timeBased()))
 
       verify(lockRepository, times(1)).acquireLock(any(), any(), any())(any())
@@ -143,6 +149,7 @@ class JobManagerSpec extends StandardSpec {
       })
 
       val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, false)
+      await(manager.allJobsScheduled)
       await(manager.retriggerJob(JobType1, UUIDs.timeBased()))
 
       verify(jobStatusRepository, times(1)).save(any())(any())

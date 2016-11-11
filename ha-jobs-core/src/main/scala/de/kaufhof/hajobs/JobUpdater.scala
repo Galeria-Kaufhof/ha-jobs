@@ -42,7 +42,7 @@ class JobUpdater(lockRepository: LockRepository,
 
   private[hajobs] def updateDeadJobState(deadJobs: List[JobStatus]): Future[List[JobStatus]] = {
     Future.traverse(deadJobs) { jobMeta =>
-      logger.info("Detected dead job, changing state to DEAD for: {}", jobMeta.jobId)
+      logger.info("Detected dead job, changing state from {} to DEAD for: {} ({})", jobMeta.jobState, jobMeta.jobId, jobMeta.jobType)
       jobStatusRepository.get(jobMeta.jobType, jobMeta.jobId).flatMap {
           case Some(data) => jobStatusRepository.updateJobState(data, JobState.Dead)
           // if no latest JobStatusData is found update JobStatusMeta instead
