@@ -9,8 +9,8 @@ val projectSettings = Seq(
 )
 
 val buildSettings = Seq(
-  scalaVersion := "2.11.7",
-  crossScalaVersions := Seq("2.11.7"),
+  scalaVersion := "2.11.8",
+  crossScalaVersions := Seq("2.11.8"),
   scalacOptions ++= Seq("-language:reflectiveCalls", "-feature", "-deprecation"),
   // fork (tests) to free resources. otherwise c* sessions are collected and will OOME at some point
   fork := true
@@ -60,8 +60,8 @@ val publishSettings = Seq(
     </developers>
 )
 
-val playVersion = "2.4.6"
-val akkaVersion = "2.4.2"
+val playVersion = "2.5.9"
+val akkaVersion = "2.4.12"
 val scalatest = "org.scalatest" %% "scalatest" % "2.2.6" % "test"
 val mockito = "org.mockito" % "mockito-core" % "1.10.19" % "test"
 val playTest = "com.typesafe.play" %% "play-test" % playVersion % "test"
