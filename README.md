@@ -5,6 +5,11 @@
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
+## New in 1.6.0
+
+- update play from 2.4 to 2.5.9
+- update akka to 2.4.12
+
 ## New in 1.5.3
 
 - Improved documentation of JobManager.allJobsScheduled 
@@ -318,7 +323,7 @@ The module `ha-jobs-play` provides a Play! controller that allows to start jobs 
 
 To use this you must add the following to the build file:
 
-    libraryDependencies += "de.kaufhof" %% "ha-jobs-play" % "1.5.2"
+    libraryDependencies += "de.kaufhof" %% "ha-jobs-play" % "1.6.0"
 
 In your routes file you have to add these routes (of course you may choose different urls):
 

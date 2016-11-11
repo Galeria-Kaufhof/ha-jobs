@@ -1,4 +1,4 @@
-val projectVersion = "1.5.3"
+val projectVersion = "1.6.0"
 
 val projectSettings = Seq(
   description := "Run distributed, highly available (batch) jobs, with job locking and supervision.",
