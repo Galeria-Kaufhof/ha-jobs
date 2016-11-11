@@ -5,6 +5,14 @@
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
+## New in 1.5.3
+
+- Improved documentation of JobManager.allJobsScheduled 
+- Added hook in JobManager for checking preconditions before jobs are started 
+- Added more information in log message for dead job detection 
+- Increase version of cassandra driver from 3.0.0 to 3.0.2 
+- Removed SBT plugin dependency-graph 
+
 ## New in 1.5.2
 
 - #25 job supervisor should retry failed jobs by given retrigger count
@@ -12,11 +20,6 @@ Implemented with Scala, Akka and Cassandra.
 ## New in 1.5.1
 
 - critical bugfix in JobSupervisor
-
-## New in 1.5.0
-
-- upgrade cassandra driver and pillar to version 3.0.0
-- refactoring of JobSupervisor to avoid upcoming exceptions which lead to incomplete futures
 
 ```
 GET    /jobs/:jobType    @de.kaufhof.hajobs.JobsController.list(jobType, limit: Int ?= 20)
