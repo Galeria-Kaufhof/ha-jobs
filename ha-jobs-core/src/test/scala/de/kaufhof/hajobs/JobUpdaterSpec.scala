@@ -20,8 +20,8 @@ class JobUpdaterSpec extends StandardSpec {
   "update jobs in JobUpdater" should {
     val jobId: UUID = UUIDs.timeBased()
     val triggerId: UUID = UUIDs.timeBased()
-    val job = JobStatus(jobId, JobType1, triggerId, JobState.Running, JobResult.Pending, DateTime.now(), None)
-    val jobWithData = JobStatus(jobId, JobType1, triggerId, JobState.Running, JobResult.Pending, DateTime.now(), Some(Json.toJson("test")))
+    val job = JobStatus(jobId, JobType1, triggerId, JobState.Running, JobResult.Pending, DateTime.now().minusMinutes(10), None)
+    val jobWithData = JobStatus(jobId, JobType1, triggerId, JobState.Running, JobResult.Pending, DateTime.now().minusMinutes(10), Some(Json.toJson("test")))
 
     "set jobStatus of dead jobs to dead" in {
       when(lockRepository.getAll()).thenReturn(Future.successful(Seq.empty))
@@ -35,6 +35,19 @@ class JobUpdaterSpec extends StandardSpec {
       await(jobUpdater.updateJobs())
       eventually {
         verify(jobStatusRepository, times(1)).updateJobState(jobWithData, JobState.Dead)
+      }
+    }
+
+    "not update if jobstatus timestamp is within waiting time" in {
+      when(lockRepository.getAll()).thenReturn(Future.successful(Seq.empty))
+      val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobType1 -> List(job.copy(jobStatusTs = DateTime.now()))))
+      when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
+      when(jobStatusRepository.get(any(), any(), anyBoolean())(any())).thenReturn(Future.successful(Some(jobWithData.copy(jobStatusTs = DateTime.now()))))
+
+      val jobUpdater = new JobUpdater(lockRepository, jobStatusRepository)
+
+      await(jobUpdater.updateJobs())
+      eventually {
       }
     }
 
