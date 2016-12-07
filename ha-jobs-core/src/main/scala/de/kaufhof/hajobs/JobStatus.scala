@@ -2,6 +2,7 @@ package de.kaufhof.hajobs
 
 import java.util.UUID
 
+import de.kaufhof.hajobs
 import de.kaufhof.hajobs.JobResult.JobResult
 import de.kaufhof.hajobs.JobState.JobState
 import de.kaufhof.hajobs.utils.EnumJsonSupport
@@ -28,6 +29,9 @@ object JobState extends Enumeration {
   val Failed = Value("FAILED")
   val Canceled = Value("CANCELED")
   val Dead = Value("DEAD")
+  val Warning = Value("WARNING")
+  val Skipped = Value("SKIPPED")
+  val NoActionNeeded = Value("NO_ACTION_NEEDED")
 
   implicit val enumRead: Reads[JobState] = EnumJsonSupport.enumReads(JobState)
   implicit val enumWrite: Writes[JobState] = EnumJsonSupport.enumWrites
@@ -119,7 +123,10 @@ object JobStatus {
     JobState.Finished -> JobResult.Success,
     JobState.Failed -> JobResult.Failed,
     JobState.Canceled -> JobResult.Failed,
-    JobState.Dead -> JobResult.Failed
+    JobState.Dead -> JobResult.Failed,
+    JobState.Warning -> JobResult.Success,
+    JobState.Skipped -> JobResult.Success,
+    JobState.NoActionNeeded -> JobResult.Success
   )
 
   def stateToResult(state: JobState): JobResult = stateResultMapping(state)
