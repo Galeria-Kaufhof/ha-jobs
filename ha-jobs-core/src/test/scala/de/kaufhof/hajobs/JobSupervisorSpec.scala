@@ -1,11 +1,11 @@
 package de.kaufhof.hajobs
 
 import com.datastax.driver.core.utils.UUIDs
-import de.kaufhof.hajobs.testutils.{StandardSpec, MockInitializers}
+import de.kaufhof.hajobs.testutils.MockInitializers._
+import de.kaufhof.hajobs.testutils.StandardSpec
 import org.joda.time.DateTime
 import org.mockito.Matchers._
 import org.mockito.Mockito._
-import MockInitializers._
 import play.api.libs.json.Json
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -23,7 +23,7 @@ class JobSupervisorSpec extends StandardSpec {
   }
 
   "update job state in JobSupervisor" should {
-    val jobStatus = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Running, JobResult.Pending, DateTime.now(), None)
+    val jobStatus = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Running, JobResult.Pending, DateTime.now().minusMinutes(10), None)
     val jobStatusWithContent = jobStatus.copy(content = Some(Json.toJson("some json")))
     val jobManager = mock[JobManager]
 
@@ -68,7 +68,7 @@ class JobSupervisorSpec extends StandardSpec {
       val jobExecution = sut.run()
       val res = intercept[RuntimeException](await(jobExecution.result))
 
-      res.getMessage should be ("error")
+      res.getMessage should be("error")
 
     }
   }
@@ -95,7 +95,7 @@ class JobSupervisorSpec extends StandardSpec {
     "do nothing if one job of the last trigger id ended successfully (even if a trigger id earlier failed))" in {
       val job1 = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Canceled, JobResult.Failed, DateTime.now.minusMillis(1))
       val job2 = JobStatus(UUIDs.timeBased(), JobTypes.JobSupervisor, UUIDs.timeBased(), JobState.Finished, JobResult.Success, DateTime.now)
-      val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(job1,job2)))
+      val successful: Future[Map[JobType, List[JobStatus]]] = Future.successful(Map(JobTypes.JobSupervisor -> List(job1, job2)))
       when(jobStatusRepository.getMetadata(anyBoolean(), any())(any())).thenReturn(successful)
       when(lockRepository.getAll()(any())).thenReturn(Future.successful(Seq.empty))
       implicit val context = JobContext(JobTypes.JobSupervisor, UUIDs.timeBased(), UUIDs.timeBased())
