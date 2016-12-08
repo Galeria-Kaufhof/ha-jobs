@@ -2,20 +2,21 @@ package de.kaufhof.hajobs
 
 import java.util.UUID
 
-import de.kaufhof.hajobs
+import com.datastax.driver.core.utils.UUIDs
 import de.kaufhof.hajobs.JobResult.JobResult
 import de.kaufhof.hajobs.JobState.JobState
 import de.kaufhof.hajobs.utils.EnumJsonSupport
-import org.joda.time.DateTime
-import org.joda.time.format.ISODateTimeFormat
+import org.joda.time.{DateTime, Period}
+import org.joda.time.format.{ISODateTimeFormat, PeriodFormat}
 import play.api.libs.json.{JsValue, _}
 
 import scala.language.implicitConversions
 import scala.util.control.NonFatal
 
 /**
- * Represents Status of Import Jobs
- */
+  * Represents Status of Import Jobs
+  * @param jobId should represent the Job start time as time-based UUID (type 1)
+  */
 case class JobStatus(triggerId: UUID, jobType: JobType, jobId: UUID, jobState: JobState, jobResult: JobResult, jobStatusTs: DateTime,
                      content: Option[JsValue] = None)
 
@@ -95,6 +96,10 @@ object JobTypes {
 
 object JobStatus {
 
+  import play.api.libs.functional.syntax._
+  import play.api.libs.json.Reads._
+  import play.api.libs.json._
+
   /**
    * Override the default DateTime json Format (just prints the unix timestamp)
    * with a one that uses a more readable form (ISO8601).
@@ -103,19 +108,52 @@ object JobStatus {
    */
   private implicit val iso8601DateTimeFormat = new Format[DateTime] {
     override def writes(o: DateTime): JsValue = JsString(o.toString(ISODateTimeFormat.dateTime()))
+
     override def reads(json: JsValue): JsResult[DateTime] = json match {
       case JsString(value) =>
-        try { JsSuccess(ISODateTimeFormat.dateTime().parseDateTime(json.as[String])) }
-        catch { case NonFatal(e) => JsError(s"Could not parse jobStatusTs: $e") }
+        try {
+          JsSuccess(ISODateTimeFormat.dateTime().parseDateTime(json.as[String]))
+        }
+        catch {
+          case NonFatal(e) => JsError(s"Could not parse jobStatusTs: $e")
+        }
       case JsNumber(value) => JsSuccess(new DateTime(value.toLong))
       case default =>
         JsError(s"Unexpected value for jobStatusTs: $json")
     }
   }
 
+  private implicit val periodFormat = new Writes[Period] {
+    override def writes(o: Period): JsValue = JsString(o.toString(PeriodFormat.wordBased()))
+  }
+
   implicit def jobStatusReads(implicit jobTypes: JobTypes): Reads[JobStatus] = Json.reads[JobStatus]
 
-  implicit val jobStatusWrites = Json.writes[JobStatus]
+  implicit def jobStatusWrites = (
+    (__ \ "triggerId").write[UUID] and
+      (__ \ "jobType").write[JobType] and
+      (__ \ "jobId").write[UUID] and
+      (__ \ "jobState").write[JobState] and
+      (__ \ "jobResult").write[JobResult] and
+      (__ \ "jobStatusTs").write[DateTime] and
+      (__ \ "content").writeNullable[JsValue] and
+      (__ \ "startTime").writeNullable[DateTime] and
+      (__ \ "duration").writeNullable[Period]
+    ).apply(asJsonTuple _)
+
+
+  private def asJsonTuple(j: JobStatus): (UUID, JobType, UUID, JobState, JobResult, DateTime, Option[JsValue], Option[DateTime], Option[Period]) = {
+
+    val maybeStartTime: Option[DateTime] = j.jobId.version() match {
+      case 1 => Some(new DateTime(UUIDs.unixTimestamp(j.jobId)))
+      case _ => None
+    }
+
+    val maybeDuration: Option[Period] = maybeStartTime.map { startTime =>
+      new Period(startTime, j.jobStatusTs)
+    }
+    (j.triggerId, j.jobType, j.jobId, j.jobState, j.jobResult, j.jobStatusTs, j.content, maybeStartTime, maybeDuration)
+  }
 
   private val stateResultMapping = Map[JobState, JobResult](
     JobState.Running -> JobResult.Pending,
