@@ -36,7 +36,7 @@ object JobStatusRepository {
  */
 class JobStatusRepository(session: Session,
                           ttl: FiniteDuration = 14.days,
-                          jobTypes: JobTypes) {
+                          jobTypes: JobTypes) extends StatusWriter {
 
   private val logger = getLogger(getClass)
 
