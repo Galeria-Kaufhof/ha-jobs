@@ -5,6 +5,10 @@
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
+## New in 1.7.1
+
+- added a trait StatusWriter to JobStatusRepository for easier mocking in tests. 
+
 ## New in 1.7.0
 
 - add new job status 
@@ -126,7 +130,7 @@ If your job is implemented as an actor, you can just use the `ActorJob`, as show
 
 You must add the ha-jobs to the dependencies of the build file, e.g. add to `build.sbt`:
 
-    libraryDependencies += "de.kaufhof" %% "ha-jobs" % "1.7.0"
+    libraryDependencies += "de.kaufhof" %% "ha-jobs" % "1.7.1"
 
 It is published to maven central for both scala 2.10 and 2.11.
 
@@ -329,7 +333,7 @@ The module `ha-jobs-play` provides a Play! controller that allows to start jobs 
 
 To use this you must add the following to the build file:
 
-    libraryDependencies += "de.kaufhof" %% "ha-jobs-play" % "1.7.0"
+    libraryDependencies += "de.kaufhof" %% "ha-jobs-play" % "1.7.1"
 
 In your routes file you have to add these routes (of course you may choose different urls):
 
