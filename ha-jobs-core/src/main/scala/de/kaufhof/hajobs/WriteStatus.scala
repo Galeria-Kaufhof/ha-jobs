@@ -2,7 +2,7 @@ package de.kaufhof.hajobs
 
 import JobState.JobState
 import org.joda.time.DateTime
-import play.api.libs.json.JsValue
+import play.api.libs.json.{JsValue, Json, Writes}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -11,13 +11,26 @@ import scala.concurrent.{ExecutionContext, Future}
  */
 trait WriteStatus {
 
-  def jobStatusRepository: JobStatusRepository
+  def jobStatusRepository: StatusWriter
 
-  protected def writeStatus(jobState: JobState, content: Option[JsValue] = None)
+  def writeStatus(jobState: JobState, content: Option[JsValue] = None)
                            (implicit jobContext: JobContext, ec: ExecutionContext): Future[JobStatus] = {
     val status = JobStatus(jobContext.triggerId, jobContext.jobType, jobContext.jobId,
       jobState, JobStatus.stateToResult(jobState), DateTime.now(), content)
     jobStatusRepository.save(status)
+  }
+
+  def writeStatus(jobState: JobState, content: JsValue)
+                           (implicit jobContext: JobContext, ec: ExecutionContext): Future[JobStatus] = {
+    writeStatus(jobState, Some(content))
+  }
+
+  /**
+    * Converts the given content to json and writes it as content of JobStatus to the StatusWriter.
+    */
+  def writeStatusAsJson[T](jobState: JobState, content: T)
+                       (implicit writes: Writes[T], jobContext: JobContext, ec: ExecutionContext): Future[JobStatus] = {
+    writeStatus(jobState, Json.toJson(content))
   }
 
 }
