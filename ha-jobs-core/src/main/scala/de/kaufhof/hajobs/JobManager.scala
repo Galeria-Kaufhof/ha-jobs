@@ -193,6 +193,10 @@ class JobManager(managedJobs: => Jobs,
 
   def jobStatus(jobType: JobType, jobId: UUID): Future[Option[JobStatus]] = jobStatusRepo.get(jobType, jobId)
 
+  def getAllJobTypes(): Future[List[JobType]] = jobStatusRepo.getAllActiveTypes()
+
+  def getCronExpression(jobType: JobType): Option[String] = getJob(jobType).cronExpression
+
   private[hajobs] def retriggerCounts: Map[JobType, Int] = managedJobs.map { case (jobType, job) =>
     jobType -> job.retriggerCount
   }
