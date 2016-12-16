@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <!--
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script type="text/javascript" src="jobsOverview/jsRoutes"></script>
+    <script type="text/javascript" src="assets/lib/ha-jobs-play/js/overview.js"></script>
+    -->
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script type="text/javascript" src="assets/lib/ha-jobs-play/js/vendor/renderjson.js"></script>
+    <script type="text/javascript" src="assets/lib/ha-jobs-play/js/vendor/later.min.js"></script>
+    <script type="text/javascript" src="assets/lib/ha-jobs-play/js/vendor/cronstrue.min.js"></script>
+
+    <!--vis.js for timeline chart-->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis.min.css">
+
+    <!-- Bootstrap latest compiled and minified CSS -->
+    <link rel="stylesheet"
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+          integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+          crossorigin="anonymous">
+
+    <!-- Bootstrap Latest compiled and minified JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+            integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
+            crossorigin="anonymous"></script>
+
+    <!-- Bootstrap Dark theme -->
+    <link rel="stylesheet"
+          href="https://bootswatch.com/darkly/bootstrap.min.css"
+          crossorigin="anonymous">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="assets/lib/ha-jobs-play/css/overview.css">
+
+    <!--Moment.js for human readable time and duration formatting-->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.15.2/moment.js"></script>
+
+    <!-- Handlebarsjs -->
+    <script type="text/javascript"
+            src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.5/handlebars.min.js"></script>
+
+    <!-- Handlebars Templates -->
+    <script id="jobtype-tab-nav-template" type="text/x-handlebars-template">
+        {{#each jobTypes}}
+        <li><a data-toggle="tab" href="#{{this}}">{{this}}</a></li>
+        {{/each}}
+    </script>
+
+    <script id="jobtype-tab-content-template" type="text/x-handlebars-template">
+        {{#each jobTypes}}
+        <div id={{this}} class="tab-pane fade">
+            <div id="jobEntry-placeholder-{{this}}"></div>
+        </div>
+        {{/each}}
+    </script>
+
+    <script id="entry-template" type="text/x-handlebars-template">
+        {{#each jobs}}
+        <div class="jobEntry">
+            <table style="margin-bottom:30px" class="table table-striped table-bordered">
+                <thead class="thead-default">
+                <tr>
+                    <th>Key</th>
+                    <th>Value</th>
+                </tr>
+                </thead>
+                <tr>
+                    <td>jobType:</td>
+                    <td> {{jobType}}</td>
+                </tr>
+                <tr>
+                    <td>jobRuntime:</td>
+                    <td> {{jobDuration}}</td>
+                </tr>
+                <tr>
+                    <td>jobId:</td>
+                    <td> {{jobId}}</td>
+                </tr>
+                <tr>
+                    <td>triggerId:</td>
+                    <td> {{triggerId}}</td>
+                </tr>
+                <tr>
+                    <td>jobState:</td>
+                    <td> {{jobState}}</td>
+                </tr>
+                <tr>
+                    <td>jobStatusTs:</td>
+                    <td> {{jobStatusTs}}</td>
+                </tr>
+                {{#if_eq jobResult "SUCCESS"}}
+                <tr class="success">
+                    <td>jobResult:</td>
+                    <td> {{jobResult}}</td>
+                </tr>
+                {{else}}
+                <tr class="warning">
+                    <td>jobResult:</td>
+                    <td> {{jobResult}}</td>
+                </tr>
+                {{/if_eq}}
+            </table>
+        </div>
+        {{/each}}
+    </script>
+
+    <script id="latest-entry-template" type="text/x-handlebars-template">
+        <div class="row">
+            <div class="col-sm-8">
+                <h2 class="text-center">Latest Job for Type {{jobType}}</h2>
+                <table class="table table-striped table-bordered">
+                    <thead class="thead-default">
+                    <tr>
+                        <th>Key</th>
+                        <th>Value</th>
+                    </tr>
+                    </thead>
+                    <tr>
+                        <td>jobType:</td>
+                        <td> {{jobType}}</td>
+                    </tr>
+                    <tr>
+                        <td>jobId:</td>
+                        <td> {{jobId}}</td>
+                    </tr>
+                    <tr>
+                        <td>triggerId:</td>
+                        <td> {{triggerId}}</td>
+                    </tr>
+                    <tr>
+                        <td>jobState:</td>
+                        <td> {{jobState}}</td>
+                    </tr>
+                    <tr>
+                        <td>jobStatusTs:</td>
+                        <td> {{jobStatusTs}}</td>
+                    </tr>
+                    {{#if_eq jobResult "SUCCESS"}}
+                    <tr class="success">
+                        <td>jobResult:</td>
+                        <td> {{jobResult}}</td>
+                    </tr>
+                    {{else}}
+                    <tr class="warning">
+                        <td>jobResult:</td>
+                        <td> {{jobResult}}</td>
+                    </tr>
+                    {{/if_eq}}
+                    <tr>
+                        <td>content:</td>
+                        <td class="content-{{jobId}}"></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-sm-4">
+                <h2 class="text-center">Actions</h2>
+                <div class="btn-group-vertical btn-block" role="group" aria-label="...">
+
+                    <button id="trigger-{{jobType}}" type="button" class="btn btn-success" aria-label="Repeat">
+                        <span class="glyphicon glyphicon-repeat" aria-hidden="true"></span> Trigger
+                    </button>
+<!--                    <button type="button" class="btn btn-warning" aria-label="Disable">
+                        <span class="glyphicon glyphicon-pause" aria-hidden="true"></span> Disable
+                    </button>-->
+                    <button id="cancel-{{jobType}}" type="button" class="btn btn-danger" aria-label="Cancel">
+                        <span class="glyphicon glyphicon-remove" aria-hidden="true"></span> Cancel
+                    </button>
+
+                </div>
+            </div>
+            <div class="col-sm-4" id="cron-{{jobType}}"></div>
+            <div class="col-sm-12">
+                <h2 align="center">Timeline</h2>
+                <div class="panel panel-default" id="timeline-{{jobType}}"></div>
+            </div>
+        </div>
+    </script>
+
+    <script id="alert-template" type="text/x-handlebars-template">
+        <div class="alert alert-{{this.style}}">
+            <strong>{{this.action}}</strong> {{{this.info}}}
+        </div>
+    </script>
+
+    <script id="item-template" type="text/x-handlebars-template">
+        <span data-jobId="{{this.content.jobId}}" data-toggle="popover" data-placement="top" data-container="body"
+        >
+            {{content.jobType}}
+        </span>
+    </script>
+
+    <script id="item-popover-content-template" type="text/x-handlebars-template">
+        <table class="table table-striped table-bordered">
+            <thead class="thead-default">
+            <tr>
+                <th>Key</th>
+                <th>Value</th>
+            </tr>
+            </thead>
+            <tr>
+                <td>jobType:</td>
+                <td> {{jobType}}</td>
+            </tr>
+            <tr>
+                <td>jobRuntime:</td>
+                <td> {{jobDuration}}</td>
+            </tr>
+            <tr>
+                <td>jobId:</td>
+                <td> {{jobId}}</td>
+            </tr>
+            <tr>
+                <td>triggerId:</td>
+                <td> {{triggerId}}</td>
+            </tr>
+            <tr>
+                <td>jobState:</td>
+                <td> {{jobState}}</td>
+            </tr>
+            <tr>
+                <td>jobStatusTs:</td>
+                <td> {{jobStatusTs}}</td>
+            </tr>
+            {{#if_eq jobResult "SUCCESS"}}
+            <tr class="success">
+                <td>jobResult:</td>
+                <td> {{jobResult}}</td>
+            </tr>
+            {{else}}
+            <tr class="warning">
+                <td>jobResult:</td>
+                <td> {{jobResult}}</td>
+            </tr>
+            {{/if_eq}}
+        </table>
+    </script>
+
+    <script id="cron-template" type="text/x-handlebars-template">
+        <h2 class="text-center">Schedule</h2>
+        <table class="table table-striped table-bordered" align="center">
+            <tr>
+                <td align="center">
+                    <pre>[ {{cron}} ]</pre>
+                </td>
+            </tr>
+            <tr>
+                <td align="center">
+                    {{pretty}}
+                </td>
+            </tr>
+        </table>
+        </div>
+    </script>
+
+
+    <title>HA-Jobs Dashboard</title>
+</head>
+<body class="my-app">
+
+<div class="container">
+    <div class="row">
+        <h1 id="title">Jobs Controller</h1>
+        <ul id="tab-nav-placeholder" class="nav nav-tabs">
+            <li class="active"><a data-toggle="tab" href="#Overview">Overview</a></li>
+        </ul>
+        <div id="tab-content-placeholder" class="tab-content">
+            <div id="Overview" class="tab-pane fade in active">
+                <h2>Latest Jobs</h2>
+                <div id="jobEntry-placeholder"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="assets/lib/ha-jobs-play/js/overview.js"></script>
+</body>
+</html>
