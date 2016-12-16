@@ -27,6 +27,7 @@ pre {
 
 .string {
     color: #1ede6c;
+    white-space: initial;
 }
 
 .number {

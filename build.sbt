@@ -1,4 +1,4 @@
-val projectVersion = "1.7.4"
+val projectVersion = "1.7.5"
 val projectScalaVersion = "2.11.8"
 
 scalaVersion := projectScalaVersion
@@ -64,8 +64,8 @@ val publishSettings = Seq(
 )
 
 val playVersion = "2.5.9"
-val akkaVersion = "2.4.12"
-val scalatest = "org.scalatest" %% "scalatest" % "2.2.6" % "test"
+val akkaVersion = "2.4.17"
+val scalatest = "org.scalatest" %% "scalatest" % "3.0.1" % "test"
 val mockito = "org.mockito" % "mockito-core" % "1.10.19" % "test"
 val playTest = "com.typesafe.play" %% "play-test" % playVersion % "test"
 
@@ -92,6 +92,7 @@ lazy val core = project.in(file("ha-jobs-core"))
   )
 
 lazy val play = project.in(file("ha-jobs-play"))
+  .enablePlugins(SbtWeb)
   .dependsOn(core)
   .settings(
     name := "ha-jobs-play",

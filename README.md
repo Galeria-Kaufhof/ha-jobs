@@ -5,6 +5,10 @@
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
+## New in 1.7.5
+
+- added user interface for monitoring and triggering jobs
+
 ## New in 1.7.4
 
 - Stability improvements of unit tests. Previous version should be avoided.
@@ -148,7 +152,7 @@ If your job is implemented as an actor, you can just use the `ActorJob`, as show
 
 You must add the ha-jobs to the dependencies of the build file, e.g. add to `build.sbt`:
 
-    libraryDependencies += "de.kaufhof" %% "ha-jobs" % "1.7.2"
+    libraryDependencies += "de.kaufhof" %% "ha-jobs" % "1.7.5"
 
 It is published to maven central for both scala 2.10 and 2.11.
 
@@ -356,10 +360,18 @@ To use this you must add the following to the build file:
 In your routes file you have to add these routes (of course you may choose different urls):
 
 
+    GET    /jobs                    @de.kaufhof.hajobs.JobsController.types
     POST   /jobs/:jobType           @de.kaufhof.hajobs.JobsController.run(jobType)
+    DELETE /jobs/:jobType           @de.kaufhof.hajobs.JobsController.cancel(jobType)
     GET    /jobs/:jobType           @de.kaufhof.hajobs.JobsController.list(jobType, limit: Int ?= 20)
     GET    /jobs/:jobType/latest    @de.kaufhof.hajobs.JobsController.latest(jobType)
     GET    /jobs/:jobType/:jobId    @de.kaufhof.hajobs.JobsController.status(jobType, jobId)
+    
+    GET    /jobsOverview            @de.kaufhof.hajobs.OverviewController.index()
+    
+    # Map static resources from the /public folder to the /assets URL path (used by frontend)
+    GET    /assets/*file            controllers.Assets.at(path = "/public", file)
+    
 
 Use your preferred dependency injection mechanism to provide the managed `JobsController` to your application. Either by
 adding a new module to your application.conf or to your `ApplicationLoader`s load function.
