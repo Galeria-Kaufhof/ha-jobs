@@ -1,4 +1,4 @@
-val projectVersion = "1.7.1"
+val projectVersion = "1.8.0-SNAPSHOT"
 
 val projectSettings = Seq(
   description := "Run distributed, highly available (batch) jobs, with job locking and supervision.",
@@ -89,6 +89,7 @@ lazy val core = project.in(file("ha-jobs-core"))
   )
 
 lazy val play = project.in(file("ha-jobs-play"))
+  .enablePlugins(SbtWeb)
   .dependsOn(core)
   .settings(
     name := "ha-jobs-play",

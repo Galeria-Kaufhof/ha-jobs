@@ -63,7 +63,9 @@ class JobsController(jobManager: JobManager,
     jobTypes(jobTypeString).map { jobType =>
       val jobStatusFuture: Future[List[JobStatus]] = jobManager.allJobStatus(jobType, limit)
       jobStatusFuture.map { jobs =>
-        Ok(Json.obj("jobs" -> jobs, "latest" -> jobs.headOption.map(job => statusUrl(jobType, job.jobId))))
+        Ok(Json.obj("jobs" -> jobs,
+          "cron" -> jobManager.getCronExpression(jobType),
+          "latest" -> jobs.headOption.map(job => statusUrl(jobType, job.jobId))))
       }
     }.getOrElse(Future.successful(NotFound))
   }
@@ -101,4 +103,24 @@ class JobsController(jobManager: JobManager,
     }.getOrElse(Future.successful(NotFound))
   }
 
+  /**
+    * Cancels the execution of the given job type.
+    */
+  def cancel(jobTypeString: String): Action[AnyContent] = Action { implicit request =>
+    jobTypes(jobTypeString) map jobManager.cancelJob match {
+      case Some(_) => Ok(Json.obj("status" -> "OK"))
+      case None => InternalServerError(Json.obj("status" -> "KO",
+        "message" -> s"JobType $jobTypeString is unknown"))
+    }
+  }
+
+  /**
+    * Supplies all active (run at least once according to statusRepo) jobTypes
+    */
+  def types(): Action[AnyContent] = Action.async {
+    val jobTypesFuture: Future[List[JobType]] = jobManager.getAllJobTypes()
+    jobTypesFuture.map { jobType =>
+      Ok(Json.obj("jobTypes" -> jobType))
+    }
+  }
 }
