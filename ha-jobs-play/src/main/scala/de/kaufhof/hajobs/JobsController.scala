@@ -101,4 +101,15 @@ class JobsController(jobManager: JobManager,
     }.getOrElse(Future.successful(NotFound))
   }
 
+  /**
+   * Cancels the execution of the given job type.
+   */
+      def cancel(jobTypeString: String): Action[AnyContent] = Action { implicit request =>
+        jobTypes(jobTypeString) map jobManager.cancelJob match {
+          case Some(_) => Ok(Json.obj("status" -> "OK"))
+          case None => InternalServerError(Json.obj("status" -> "KO",
+              "message" -> s"Error when canceling job. JobType $jobTypeString is unknown"))
+        }
+    }
+
 }
