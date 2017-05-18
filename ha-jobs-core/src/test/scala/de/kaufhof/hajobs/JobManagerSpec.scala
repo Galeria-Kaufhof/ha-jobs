@@ -12,7 +12,7 @@ import org.quartz.Scheduler
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import play.api.Application
 import de.kaufhof.hajobs.testutils.StandardSpec
-import org.joda.time.{DateTime, DateTimeConstants}
+import org.joda.time.{DateTime, DateTimeConstants, DateTimeZone}
 
 import scala.concurrent.{Future, Promise, blocking}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -86,14 +86,17 @@ class JobManagerSpec extends StandardSpec {
     }
 
     "not trigger a missed job immediately if the next run is only some minutes in the future" in {
-      val fiveMinutesAgo = DateTime.now().minusMinutes(5)
-      val job = spy(new TestJob(Some(s"0 ${fiveMinutesAgo.getMinuteOfHour}/20 * * * ?")))
+      val testDate = new DateTime(2017, 5, 16, 15, 14, DateTimeZone.UTC)
+      val fiveMinutesAgo = testDate.minusMinutes(5)
+      val job = spy(new TestJob(Some("0 10/20 * * * ?")))
 
       val mockedScheduler = mock[Scheduler]
       val lastJobStatus = JobStatus(UUIDs.timeBased(), job.jobType, UUIDs.timeBased(),
-        JobState.Finished, JobResult.Success, DateTime.now().minusDays(1))
+        JobState.Finished, JobResult.Success, testDate.minusDays(1))
       when(jobStatusRepository.list(any(), any(), any())(any())).thenReturn(Future.successful(List(lastJobStatus)))
-      val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, true)
+      val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, true) {
+        override protected def now = testDate
+      }
       await(manager.allJobsScheduled)
 
       verify(mockedScheduler, times(1)).start()
