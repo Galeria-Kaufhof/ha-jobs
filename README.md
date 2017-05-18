@@ -7,7 +7,7 @@ Implemented with Scala, Akka and Cassandra.
 
 ## New in 1.7.4
 
-- Only stability improvements of unit tests
+- Stability improvements of unit tests. Previous version should not be used.
 
 ## New in 1.7.3
 
