@@ -5,6 +5,16 @@
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
+## New in 1.7.3
+
+- A log message with level error is now logged when a job result
+  is a failed future. Previously, there was no special handling
+  for failed futures, they were handled like successful futures.
+- Jobs that were scheduled during a downtime of the server
+  are now automatically triggered after a restart. This is
+  only done if the next regular run would be more than
+  30 minutes in the future (configurable).
+
 ## New in 1.7.2
 
 - added a controller Action to cancel jobs via REST API 

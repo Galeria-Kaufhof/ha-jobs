@@ -34,18 +34,24 @@ class JobExecutor(lockRepo: LockRepository) extends Actor with ActorLogging {
           self ! Running(job, execution, lockKeeper)
           // We must register the onComplete callback after the Running msg,
           // otherwise the Completed msg might be received before the was registered.
-          execution.result.onComplete { _ =>
-            self ! Completed(execution.context)
+          execution.result.onComplete {
+            case Success(_) => self ! Completed(execution.context, None)
+            case Failure(e) => self ! Completed(execution.context, Some(e))
           }
         case Success(r) => origSender ! r
         case Failure(e) => origSender ! Status.Failure(e)
       }
     case msg@Running(job, execution, lockKeeper) =>
       context.become(running(jobs + (execution.context.jobId -> msg)))
-    case Completed(ctxt) =>
+    case Completed(ctxt, maybeThrowable) =>
       jobs.get(ctxt.jobId) match {
         case Some(running) =>
-          log.info("Job {} / {} completed, cleaning up...", ctxt.jobType.name, ctxt.jobId)
+          maybeThrowable match {
+            case None =>
+              log.info("Job {} / {} completed, cleaning up...", ctxt.jobType.name, ctxt.jobId)
+            case Some(e) =>
+              log.error(e, s"Job ${ctxt.jobType.name} / ${ctxt.jobId} finished with Exception: ${e.getMessage}. Cleaning up...")
+          }
           running.lockKeeper.foreach { lockKeeper =>
             context.stop(lockKeeper)
             lockRepo.releaseLock(ctxt.jobType, ctxt.jobId)
@@ -195,6 +201,6 @@ object JobExecutor {
    * Sent by the JobExecution.result.onComplete callback to the JobExecutor actor
    * to trigger cleanup (e.g. lock release).
    */
-  private[JobExecutor] case class Completed(jobContext: JobContext)
+  private[JobExecutor] case class Completed(jobContext: JobContext, exception: Option[Throwable])
 
 }
