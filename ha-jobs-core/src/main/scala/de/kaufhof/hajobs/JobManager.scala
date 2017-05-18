@@ -128,12 +128,17 @@ class JobManager(managedJobs: => Jobs,
     */
   protected def acceptableDelayAfterRestart(jobType: JobType): Duration = 30.minutes
 
+  /**
+    * Can be overridden in tests.
+    */
+  protected def now: DateTime = DateTime.now()
+
   protected def runJobNowIfPreviousRunWasSkipped(cronExpression: String, jobType: JobType): Future[Boolean] = {
     allJobStatus(jobType, limit = 1).flatMap {
       case status :: Nil =>
         val cron = new CronExpression(cronExpression)
         val nextFireTimeAfterLastRun = new DateTime(cron.getNextValidTimeAfter(status.jobStatusTs.toDate))
-        val nextFireTime = new DateTime(cron.getNextValidTimeAfter(DateTime.now().toDate))
+        val nextFireTime = new DateTime(cron.getNextValidTimeAfter(now.toDate))
         if (nextFireTimeAfterLastRun.isBeforeNow) {
           if (nextFireTime.minusMillis(acceptableDelayAfterRestart(jobType).toMillis.toInt).isAfterNow) {
             // The next scheduled run time of the job after the last execution was before now.
@@ -209,7 +214,7 @@ class JobManager(managedJobs: => Jobs,
             logger.error(s"Error starting Job {} triggerId {}, set JobStatus to Failed! ", jobType, triggerId, e)
             retry(3, s"saveJobStartFailure(${job.jobType.name}/triggerId $triggerId)") {
               jobStatusRepo.save(
-                JobStatus(triggerId, jobType, UUIDs.timeBased(), JobState.Failed, JobResult.Failed, DateTime.now(), Some(Json.toJson(e.getMessage)))
+                JobStatus(triggerId, jobType, UUIDs.timeBased(), JobState.Failed, JobResult.Failed, now, Some(Json.toJson(e.getMessage)))
               )
             }.map(_ => Error(s"Error starting Job $jobType triggerId $triggerId, set JobStatus to Failed! Msg: ${e.getMessage}"))
               .recover {

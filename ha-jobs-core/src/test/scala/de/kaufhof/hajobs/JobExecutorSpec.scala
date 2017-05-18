@@ -91,7 +91,7 @@ object JobExecutorSpec {
   }
 
   case class PromiseJob(promise: Promise[Unit] = Promise[Unit](),
-                        override val lockTimeout: FiniteDuration = 100 millis) extends Job(JobType1, 3) {
+                        override val lockTimeout: FiniteDuration = 100 millis) extends Job(JobType2, 3) {
 
     @volatile
     var canceled = false

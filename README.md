@@ -5,6 +5,10 @@
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
+## New in 1.7.4
+
+- Stability improvements of unit tests. Previous version should be avoided.
+
 ## New in 1.7.3
 
 - A log message with level error is now logged when a job result
