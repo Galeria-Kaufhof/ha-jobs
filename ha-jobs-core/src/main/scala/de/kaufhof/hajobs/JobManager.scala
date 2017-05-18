@@ -82,7 +82,7 @@ class JobManager(managedJobs: => Jobs,
     actorSystem.stop(executor)
   }
 
-  protected def scheduleJob(jobToSchedule: Job) = {
+  protected def scheduleJob(jobToSchedule: Job): Future[Unit] = {
     val jobType = jobToSchedule.jobType
     try {
       jobToSchedule.cronExpression match {
@@ -107,20 +107,64 @@ class JobManager(managedJobs: => Jobs,
           scheduler.scheduleJob(job, trigger)
 
           logger.info("Job '{}' has cron expression '{}', first execution at {}", jobType, trigger.getCronExpression, trigger.getNextFireTime)
+
+          runJobNowIfPreviousRunWasSkipped(cronExpression, jobType).map(_ => ())
         case None =>
           logger.info("No cronExpression defined for job {}", jobType)
+          Future.successful(())
       }
     } catch {
       case NonFatal(e) =>
         logger.error(s"Could not start scheduler for job type $jobType", e)
-        allJobsScheduledPromise.failure(e)
-        throw e
+        Future.failed(e)
     }
   }
 
-  protected def scheduleJobs: Unit = {
-    managedJobs.values.foreach(scheduleJob)
-    allJobsScheduledPromise.success(true)
+  /**
+    * If a job run was missing due to a server downtime, a job is started immediately after a
+    * restart if the next scheduled run is more than this duration in the future.
+    * By default, this is set to 30 minutes for all job types, but it can be overridden
+    * in subclasses.
+    */
+  protected def acceptableDelayAfterRestart(jobType: JobType): Duration = 30.minutes
+
+  protected def runJobNowIfPreviousRunWasSkipped(cronExpression: String, jobType: JobType): Future[Boolean] = {
+    allJobStatus(jobType, limit = 1).flatMap {
+      case status :: Nil =>
+        val cron = new CronExpression(cronExpression)
+        val nextFireTimeAfterLastRun = new DateTime(cron.getNextValidTimeAfter(status.jobStatusTs.toDate))
+        val nextFireTime = new DateTime(cron.getNextValidTimeAfter(DateTime.now().toDate))
+        if (nextFireTimeAfterLastRun.isBeforeNow) {
+          if (nextFireTime.minusMillis(acceptableDelayAfterRestart(jobType).toMillis.toInt).isAfterNow) {
+            // The next scheduled run time of the job after the last execution was before now.
+            // That probably means that it was during a down-time of the server and so it should
+            // probably run as soon as possible.
+            logger.info(s"The previous run of job ${jobType.name} was probably scheduled during a down-time " +
+              s"of the server s($nextFireTimeAfterLastRun), starting the job now...")
+            triggerJob(jobType).map(_ => true)
+          } else {
+            logger.info(s"The previous run of job ${jobType.name} was probably scheduled during a down-time " +
+              s"of the server s($nextFireTimeAfterLastRun); will not restart the job since the next scheduled " +
+              s"run is already at $nextFireTime.")
+            Future.successful(false)
+          }
+        } else {
+          // No
+          Future.successful(false)
+        }
+      case _ =>
+        // No previous job run - we ignore jobs that have never run before
+        Future.successful(false)
+    }
+  }
+
+  protected def scheduleJobs(): Future[Unit] = {
+    val result = Future.sequence(managedJobs.values.map(scheduleJob))
+    result.onComplete {
+      case Success(_) => allJobsScheduledPromise.success(true)
+      case Failure(e) => allJobsScheduledPromise.failure(e)
+    }
+    result.map (_ => ())
   }
 
   /**
@@ -253,7 +297,7 @@ private[hajobs] object TPData {
         case Some(x) =>
           x.asInstanceOf[T]
         case None =>
-          throw new IllegalStateException(s"missing required key '${key}' in job data")
+          throw new IllegalStateException(s"missing required key '$key' in job data")
       }
     }
     new TPData(get[JobType]("jobType"), get[JobManager]("manager"))
