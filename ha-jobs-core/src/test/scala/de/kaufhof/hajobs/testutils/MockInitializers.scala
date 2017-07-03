@@ -4,24 +4,23 @@ import java.util.UUID
 
 import com.datastax.driver.core.utils.UUIDs
 import de.kaufhof.hajobs.{JobStatus, JobStatusRepository, JobType, LockRepository}
-import org.mockito.Matchers._
-import org.mockito.Mockito
+import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
 import org.quartz.Scheduler
-import org.scalatest.mock.MockitoSugar.mock
+import org.scalatest.mockito.MockitoSugar.mock
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 
 object MockInitializers {
-  def initializeScheduler = mock[Scheduler]
+  def initializeScheduler: Scheduler = mock[Scheduler]
 
   def initializeLockRepo(): LockRepository = initializeLockRepo(mock[LockRepository])
 
   def initializeLockRepo(lockRepo: LockRepository): LockRepository = {
-    Mockito.reset(lockRepo)
+    reset(lockRepo)
     when(lockRepo.acquireLock(any[JobType], any[UUID], any[Duration])(any())).thenReturn(Future.successful(true))
     when(lockRepo.updateLock(any[JobType], any[UUID], any[Duration])(any())).thenReturn(Future.successful(true))
     when(lockRepo.getIdForType(any[JobType])(any())).thenReturn(Future.successful(Some(UUIDs.timeBased())))

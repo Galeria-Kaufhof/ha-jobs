@@ -3,20 +3,19 @@ package de.kaufhof.hajobs
 import akka.actor.{ActorNotFound, ActorSystem}
 import com.datastax.driver.core.utils.UUIDs
 import de.kaufhof.hajobs.JobManagerSpec._
-import de.kaufhof.hajobs.testutils.MockInitializers
-import org.mockito.Matchers._
+import de.kaufhof.hajobs.testutils.{MockInitializers, StandardSpec}
+import org.joda.time.{DateTime, DateTimeConstants, DateTimeZone}
+import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
 import org.quartz.Scheduler
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import play.api.Application
-import de.kaufhof.hajobs.testutils.StandardSpec
-import org.joda.time.{DateTime, DateTimeConstants, DateTimeZone}
 
-import scala.concurrent.{Future, Promise, blocking}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent.{Future, blocking}
 import scala.language.postfixOps
 
 class JobManagerSpec extends StandardSpec {
@@ -139,7 +138,7 @@ class JobManagerSpec extends StandardSpec {
 
       val manager = new JobManager(Seq(job), lockRepository, jobStatusRepository, actorSystem, mockedScheduler, false)
       await(manager.allJobsScheduled)
-      a[RuntimeException] should be thrownBy(await(manager.retriggerJob(JobType1, UUIDs.timeBased())))
+      a[RuntimeException] should be thrownBy await(manager.retriggerJob(JobType1, UUIDs.timeBased()))
 
       verify(lockRepository, times(3)).acquireLock(any(), any(), any())(any())
       verify(lockRepository, times(3)).releaseLock(any(), any())(any())

@@ -4,15 +4,16 @@ import java.util.UUID.randomUUID
 
 import org.joda.time.DateTime
 import org.mockito.Mockito._
-import org.mockito.Matchers.{eq => meq, anyInt}
+import org.mockito.ArgumentMatchers.{anyInt, eq => meq}
 import org.scalatest._
-import org.scalatest.mock.MockitoSugar
+import org.scalatest.mockito.MockitoSugar
 import play.api.http.MimeTypes
 import play.api.libs.json.Json
 import play.api.mvc._
-import play.api.test.FakeRequest
+import play.api.test.{FakeRequest, Helpers}
 import play.api.test.Helpers._
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.language.postfixOps
 
@@ -32,9 +33,14 @@ class JobsControllerSpec extends WordSpec with BeforeAndAfterEach with Matchers 
   private def statusUrl(jobType: String, jobId: String): String = s"/$jobType/imports/$jobId"
 
   // We don't have working reverse routes, therefore we're unit testing the controller...
-  private val controller = new JobsController(jobManager, JobTypes(jobType1), new {
-    def status(jobType: String, jobId: String) = Call("GET", statusUrl(jobType, jobId))
-  })
+  private val controller = new JobsController(
+    jobManager,
+    JobTypes(jobType1),
+    new {
+      def status(jobType: String, jobId: String) = Call("GET", statusUrl(jobType, jobId))
+    },
+    Helpers.stubControllerComponents()
+  )
 
   private def run(action: Action[AnyContent]): Future[Result] = action.apply(FakeRequest())
 

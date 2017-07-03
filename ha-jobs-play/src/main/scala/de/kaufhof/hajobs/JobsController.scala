@@ -3,12 +3,11 @@ package de.kaufhof.hajobs
 import java.util.UUID
 
 import play.api.Logger
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.libs.json._
 import play.api.mvc._
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.language.postfixOps
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -18,7 +17,9 @@ class JobsController(jobManager: JobManager,
                      // We don't have a reverse router yet, this needs to be supplied by the app
                      reverseRouter: {
                        def status(jobType: String, jobId: String): Call
-                     }) extends Controller {
+                     },
+                     controllerComponents: ControllerComponents
+                    )(implicit ec: ExecutionContext) extends AbstractController(controllerComponents) {
 
   private val logger = Logger(getClass)
 
@@ -104,7 +105,7 @@ class JobsController(jobManager: JobManager,
   /**
    * Cancels the execution of the given job type.
    */
-      def cancel(jobTypeString: String): Action[AnyContent] = Action { implicit request =>
+      def cancel(jobTypeString: String): Action[AnyContent] = controllerComponents.actionBuilder { implicit request =>
         jobTypes(jobTypeString) map jobManager.cancelJob match {
           case Some(_) => Ok(Json.obj("status" -> "OK"))
           case None => InternalServerError(Json.obj("status" -> "KO",
