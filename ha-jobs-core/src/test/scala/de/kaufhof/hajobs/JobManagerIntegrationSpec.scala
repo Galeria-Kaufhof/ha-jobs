@@ -5,7 +5,7 @@ import java.util.concurrent.CountDownLatch
 import akka.actor.ActorSystem
 import de.kaufhof.hajobs.testutils.CassandraSpec
 import org.quartz.Scheduler
-import org.scalatest.mock.MockitoSugar
+import org.scalatest.mockito.MockitoSugar
 import play.api.test._
 
 import scala.concurrent.ExecutionContext.Implicits.global

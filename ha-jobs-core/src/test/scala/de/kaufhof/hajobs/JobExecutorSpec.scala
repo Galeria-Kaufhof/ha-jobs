@@ -5,7 +5,7 @@ import java.util.UUID
 import com.datastax.driver.core.utils.UUIDs
 import de.kaufhof.hajobs.JobExecutorSpec.{ImmediateJob, PromiseJob}
 import de.kaufhof.hajobs.testutils.ActorSpec
-import org.mockito.Matchers.{eq => meq, _}
+import org.mockito.ArgumentMatchers.{eq => meq, _}
 import org.mockito.Mockito._
 import org.scalatest.OptionValues._
 import org.scalatest.concurrent.Eventually._

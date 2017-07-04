@@ -3,7 +3,7 @@ package de.kaufhof.hajobs
 import java.util.UUID
 
 import com.datastax.driver.core.ConsistencyLevel.{LOCAL_QUORUM, LOCAL_SERIAL}
-import com.datastax.driver.core._
+import com.datastax.driver.core.{RegularStatement, ResultSet, Row, Session}
 import com.datastax.driver.core.querybuilder.QueryBuilder._
 import com.datastax.driver.core.querybuilder.{Insert, QueryBuilder}
 import de.kaufhof.hajobs.utils.CassandraUtils._

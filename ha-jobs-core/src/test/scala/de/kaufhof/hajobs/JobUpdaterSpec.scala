@@ -5,7 +5,7 @@ import java.util.UUID
 import com.datastax.driver.core.utils.UUIDs
 import de.kaufhof.hajobs.testutils.StandardSpec
 import org.joda.time.DateTime
-import org.mockito.Matchers._
+import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
 import play.api.libs.json.Json
 
@@ -60,7 +60,7 @@ class JobUpdaterSpec extends StandardSpec {
 
       await(jobUpdater.updateJobs())
       eventually {
-        verify(jobStatusRepository, times(1)).getMetadata(true, limitByJobType = JobStatusRepository.defaultLimitByJobType)
+        verify(jobStatusRepository, times(1)).getMetadata(readwithQuorum = true, limitByJobType = JobStatusRepository.defaultLimitByJobType)
         verifyNoMoreInteractions(jobStatusRepository)
       }
     }

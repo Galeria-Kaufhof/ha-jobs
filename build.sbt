@@ -1,7 +1,8 @@
 val projectVersion = "1.7.4"
-val projectScalaVersion = "2.11.8"
+val projectScalaVersion = "2.12.2"
 
 scalaVersion := projectScalaVersion
+crossScalaVersions := Seq(projectScalaVersion, "2.11.11")
 
 val projectSettings = Seq(
   description := "Run distributed, highly available (batch) jobs, with job locking and supervision.",
@@ -13,7 +14,7 @@ val projectSettings = Seq(
 
 val buildSettings = Seq(
   scalaVersion := projectScalaVersion,
-  crossScalaVersions := Seq(projectScalaVersion),
+  crossScalaVersions := Seq(projectScalaVersion, "2.11.11"),
   scalacOptions ++= Seq("-language:reflectiveCalls", "-feature", "-deprecation"),
   // fork (tests) to free resources. otherwise c* sessions are collected and will OOME at some point
   fork := true
@@ -63,10 +64,10 @@ val publishSettings = Seq(
     </developers>
 )
 
-val playVersion = "2.5.9"
-val akkaVersion = "2.4.12"
-val scalatest = "org.scalatest" %% "scalatest" % "2.2.6" % "test"
-val mockito = "org.mockito" % "mockito-core" % "1.10.19" % "test"
+val playVersion = "2.6.0"
+val akkaVersion = "2.5.3"
+val scalatest = "org.scalatest" %% "scalatest" % "3.0.3" % "test"
+val mockito = "org.mockito" % "mockito-core" % "2.8.47" % "test"
 val playTest = "com.typesafe.play" %% "play-test" % playVersion % "test"
 
 lazy val core = project.in(file("ha-jobs-core"))
@@ -77,17 +78,17 @@ lazy val core = project.in(file("ha-jobs-core"))
   .settings(
     resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
     libraryDependencies ++= Seq(
-      "com.datastax.cassandra" % "cassandra-driver-core" % "3.0.2",
+      "com.datastax.cassandra" % "cassandra-driver-core" % "3.3.0",
       "com.typesafe.play" %% "play-json" % playVersion exclude("com.typesafe.play", "play_" + scalaVersion.value.substring(0, 4)),
-      "joda-time" % "joda-time" % "2.9.2",
-      "org.slf4j" % "slf4j-api" % "1.7.18",
-      "org.quartz-scheduler" % "quartz" % "2.2.2",
+      "joda-time" % "joda-time" % "2.9.9",
+      "org.slf4j" % "slf4j-api" % "1.7.25",
+      "org.quartz-scheduler" % "quartz" % "2.3.0",
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
       playTest,
       scalatest,
       mockito,
-      "de.kaufhof" %% "pillar" % "3.0.0" % "test"
+      "de.kaufhof" %% "pillar" % "4.1.0" % "test"
     )
   )
 
