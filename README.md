@@ -5,6 +5,10 @@
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
+## New in 1.8.0
+- Cross compile for scala 2.11 and 2.12
+- Play module now uses 2.6.0
+
 ## New in 1.7.4
 
 - Stability improvements of unit tests. Previous version should be avoided.

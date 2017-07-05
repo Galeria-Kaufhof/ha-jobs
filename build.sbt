@@ -1,4 +1,4 @@
-val projectVersion = "1.7.4"
+val projectVersion = "1.8.0"
 val projectScalaVersion = "2.12.2"
 
 scalaVersion := projectScalaVersion
