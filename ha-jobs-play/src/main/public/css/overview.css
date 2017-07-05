@@ -1,0 +1,47 @@
+.my-app .popover{
+    max-width: inherit;
+}
+
+.vis-item.vis-selected{
+    background: #bb5bd4;
+}
+
+.my-app .tab-pane .table{
+    margin-bottom: 0;
+}
+
+.my-app .vis-time-axis .vis-text{
+    color: white;
+}
+
+pre {
+    color: #ffffff;
+    padding: 5px;
+    margin: 5px;
+    background-color: inherit;
+}
+
+.object.syntax{
+    color: white;
+}
+
+.string {
+    color: #1ede6c;
+    white-space: initial;
+}
+
+.number {
+    color: #bb5bd4;
+}
+
+.boolean {
+    color: #ca1559;
+}
+
+.null {
+    color: #7c5000;
+}
+
+.key {
+    color: #1dd0d3;
+}

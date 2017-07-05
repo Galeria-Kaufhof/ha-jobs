@@ -121,7 +121,7 @@ class JobStatusRepository(session: Session,
                   limitByJobType: JobType => Int = JobStatusRepository.defaultLimitByJobType)
                  (implicit ec: ExecutionContext): Future[Map[JobType, List[JobStatus]]] = {
     def getAllMetadata(jobType: JobType): Future[(JobType, List[JobStatus])] = {
-      import scala.collection.JavaConversions._
+      import scala.collection.JavaConverters._
       implicit def dateTimeOrdering: Ordering[DateTime] = Ordering.fromLessThan(_ isAfter _)
 
 
@@ -139,7 +139,7 @@ class JobStatusRepository(session: Session,
         selectMetadata <- Future(selectStmt)
         metadata <- session.executeAsync(selectMetadata).map(res => {
           val jobStatusList: List[JobStatus] =
-            res.all.toList.flatMap(row => rowToStatus(row, isMeta = true)).sortBy(_.jobStatusTs)
+            res.all.asScala.toList.flatMap(row => rowToStatus(row, isMeta = true)).sortBy(_.jobStatusTs)
           jobType -> jobStatusList
         })
       } yield {
@@ -155,7 +155,7 @@ class JobStatusRepository(session: Session,
    */
   def getJobHistory(jobType: JobType, jobId: UUID, withQuorum: Boolean = false)
                    (implicit ec: ExecutionContext): Future[List[JobStatus]] = {
-    import scala.collection.JavaConversions._
+    import scala.collection.JavaConverters._
 
     val selectStmt = select().all()
       .from(DataTable)
@@ -167,14 +167,14 @@ class JobStatusRepository(session: Session,
     }
 
     session.executeAsync(selectStmt).map(res =>
-      res.all.toList.flatMap( row =>
+      res.all.asScala.toList.flatMap( row =>
         rowToStatus(row, isMeta = false)
       ))
   }
 
   def list(jobType: JobType, limit: Int = 20, withQuorum: Boolean = false)
           (implicit ec: ExecutionContext): Future[List[JobStatus]] = {
-    import scala.collection.JavaConversions._
+    import scala.collection.JavaConverters._
     val selectStmt = select().all()
       .from(MetaTable)
       .where(QueryBuilder.eq(JobTypeColumn, jobType.name))
@@ -185,7 +185,7 @@ class JobStatusRepository(session: Session,
     }
 
     session.executeAsync(selectStmt).map(res =>
-      res.all().toList.flatMap( result =>
+      res.all().asScala.toList.flatMap( result =>
         rowToStatus(result, isMeta = true)
       ))
   }
@@ -207,6 +207,32 @@ class JobStatusRepository(session: Session,
       Option(res.one).flatMap( result =>
         rowToStatus(result, isMeta = false)
       ))
+  }
+
+  /**
+    * Returns all JobTypes for which jobs have been run at least once
+    * (i.e. which have an entry in the MetaTable)
+    */
+  def getAllActiveTypes() (implicit ec: ExecutionContext): Future[List[JobType]]= {
+    import scala.collection.JavaConverters._
+    // SELECT DISTINCT jobTypeColumn FROM MetaTable
+    val selectStmt = select(JobTypeColumn).distinct().from(MetaTable)
+
+    session.executeAsync(selectStmt).map(res =>
+      res.all().asScala.toList.flatMap( result =>
+        rowToJobType(result)
+      ))
+  }
+
+  private def rowToJobType(row: Row): Option[JobType] = {
+    def table = "job_status_meta"
+
+    val jobTypeName = row.getString(JobTypeColumn)
+    jobTypes(jobTypeName) match {
+      case Some(jobType) => Option(jobType)
+      case None => logger.error(s"Could not find JobType for name: $jobTypeName(table $table)")
+        None
+    }
   }
 
   private def rowToStatus(row: Row, isMeta: Boolean): Option[JobStatus] = {

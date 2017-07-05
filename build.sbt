@@ -1,4 +1,4 @@
-val projectVersion = "1.8.0"
+val projectVersion = "1.8.1"
 val projectScalaVersion = "2.12.2"
 
 scalaVersion := projectScalaVersion
@@ -64,10 +64,11 @@ val publishSettings = Seq(
     </developers>
 )
 
-val playVersion = "2.6.0"
-val akkaVersion = "2.5.3"
+val playVersion = "2.6.11"
+val akkaVersion = "2.5.9"
 val scalatest = "org.scalatest" %% "scalatest" % "3.0.3" % "test"
 val mockito = "org.mockito" % "mockito-core" % "2.8.47" % "test"
+
 val playTest = "com.typesafe.play" %% "play-test" % playVersion % "test"
 
 lazy val core = project.in(file("ha-jobs-core"))
@@ -79,7 +80,7 @@ lazy val core = project.in(file("ha-jobs-core"))
     resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
     libraryDependencies ++= Seq(
       "com.datastax.cassandra" % "cassandra-driver-core" % "3.3.0",
-      "com.typesafe.play" %% "play-json" % playVersion exclude("com.typesafe.play", "play_" + scalaVersion.value.substring(0, 4)),
+      "com.typesafe.play" %% "play-json" % "2.6.9" exclude("com.typesafe.play", "play_" + scalaVersion.value.substring(0, 4)),
       "joda-time" % "joda-time" % "2.9.9",
       "org.slf4j" % "slf4j-api" % "1.7.25",
       "org.quartz-scheduler" % "quartz" % "2.3.0",
@@ -93,6 +94,7 @@ lazy val core = project.in(file("ha-jobs-core"))
   )
 
 lazy val play = project.in(file("ha-jobs-play"))
+  .enablePlugins(SbtWeb)
   .dependsOn(core)
   .settings(
     name := "ha-jobs-play",
@@ -105,7 +107,7 @@ lazy val play = project.in(file("ha-jobs-play"))
     resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
     libraryDependencies ++= Seq(
       "com.typesafe.play" %% "play" % playVersion,
-      "com.typesafe.play" %% "play-json" % playVersion,
+      "com.typesafe.play" %% "play-json" % "2.6.9",
       playTest,
       scalatest,
       mockito
