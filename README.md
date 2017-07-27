@@ -373,6 +373,7 @@ In your routes file you have to add these routes (of course you may choose diffe
     # Map static resources from the /public folder to the /assets URL path (used by frontend)
     GET    /assets/*file            controllers.Assets.at(path = "/public", file)
     
+A jobs overview page is available at http://localhost:9000/jobsOverview
 
 Use your preferred dependency injection mechanism to provide the managed `JobsController` to your application. Either by
 adding a new module to your application.conf or to your `ApplicationLoader`s load function.
