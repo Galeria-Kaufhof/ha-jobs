@@ -380,6 +380,7 @@ adding a new module to your application.conf or to your `ApplicationLoader`s loa
 val jobManager = ... // the JobManager
 val jobTypes = ... // e.g. JobTypes(ProductImportJobType) in the 1st example
 new JobsController(jobManager, jobTypes, de.kaufhof.hajobs.routes.JobsController)
+new OverviewController //supplies the single page application gui
 ```
 
 The `de.kaufhof.hajobs.routes.JobsController` is the reverse router (`ReverseJobsController`) created by Play!
@@ -388,6 +389,8 @@ on compilation.
 Then you can manage your jobs via http, e.g. using the following for a job of `JobType("productimport")`:
 
 ```bash
+# get a list of all job types
+curl http://localhost:9000/jobs
 # get a list of all job executions
 curl http://localhost:9000/jobs/productimport
 # get redirected to the status of the latest job execution
@@ -396,6 +399,8 @@ curl -L http://localhost:9000/jobs/productimport/latest
 curl http://localhost:9000/jobs/productimport/a13037f0-9076-11e4-a8d6-4ff0e8bdfb24
 # execute the job
 curl -X POST http://localhost:9000/jobs/productimport
+# cancel the job execution
+curl -X DELETE http://localhost:9000/jobs/productimport
 ```
 
 ## License
