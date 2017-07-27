@@ -1,6 +1,6 @@
 # HA-Jobs
 
-[![Build Status](https://travis-ci.org/Galeria-Kaufhof/ha-jobs.png?branch=master)](https://travis-ci.org/Galeria-Kaufhof/ha-jobs)
+[![Build Status](https://travis-ci.org/Galeria-Kaufhof/ha-jobs.png?branch=play-2.5)](https://travis-ci.org/Galeria-Kaufhof/ha-jobs)
 
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
@@ -367,6 +367,7 @@ In your routes file you have to add these routes (of course you may choose diffe
     GET    /jobs/:jobType/latest    @de.kaufhof.hajobs.JobsController.latest(jobType)
     GET    /jobs/:jobType/:jobId    @de.kaufhof.hajobs.JobsController.status(jobType, jobId)
     
+    # The entry point to the gui
     GET    /jobsOverview            @de.kaufhof.hajobs.OverviewController.index()
     
     # Map static resources from the /public folder to the /assets URL path (used by frontend)
