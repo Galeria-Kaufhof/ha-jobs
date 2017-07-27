@@ -355,7 +355,7 @@ The module `ha-jobs-play` provides a Play! controller that allows to start jobs 
 
 To use this you must add the following to the build file:
 
-    libraryDependencies += "de.kaufhof" %% "ha-jobs-play" % "1.7.4"
+    libraryDependencies += "de.kaufhof" %% "ha-jobs-play" % "1.7.5"
 
 In your routes file you have to add these routes (of course you may choose different urls):
 
