@@ -1,9 +1,13 @@
 # HA-Jobs
 
-[![Build Status](https://travis-ci.org/Galeria-Kaufhof/ha-jobs.png?branch=master)](https://travis-ci.org/Galeria-Kaufhof/ha-jobs)
+[![Build Status](https://travis-ci.org/Galeria-Kaufhof/ha-jobs.png?branch=play-2.5)](https://travis-ci.org/Galeria-Kaufhof/ha-jobs)
 
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
+
+## New in 1.7.5
+
+- added user interface for monitoring and triggering jobs
 
 ## New in 1.7.4
 
@@ -148,7 +152,7 @@ If your job is implemented as an actor, you can just use the `ActorJob`, as show
 
 You must add the ha-jobs to the dependencies of the build file, e.g. add to `build.sbt`:
 
-    libraryDependencies += "de.kaufhof" %% "ha-jobs" % "1.7.2"
+    libraryDependencies += "de.kaufhof" %% "ha-jobs" % "1.7.5"
 
 It is published to maven central for both scala 2.10 and 2.11.
 
@@ -351,15 +355,25 @@ The module `ha-jobs-play` provides a Play! controller that allows to start jobs 
 
 To use this you must add the following to the build file:
 
-    libraryDependencies += "de.kaufhof" %% "ha-jobs-play" % "1.7.1"
+    libraryDependencies += "de.kaufhof" %% "ha-jobs-play" % "1.7.5"
 
 In your routes file you have to add these routes (of course you may choose different urls):
 
 
+    GET    /jobs                    @de.kaufhof.hajobs.JobsController.types
     POST   /jobs/:jobType           @de.kaufhof.hajobs.JobsController.run(jobType)
+    DELETE /jobs/:jobType           @de.kaufhof.hajobs.JobsController.cancel(jobType)
     GET    /jobs/:jobType           @de.kaufhof.hajobs.JobsController.list(jobType, limit: Int ?= 20)
     GET    /jobs/:jobType/latest    @de.kaufhof.hajobs.JobsController.latest(jobType)
     GET    /jobs/:jobType/:jobId    @de.kaufhof.hajobs.JobsController.status(jobType, jobId)
+    
+    # The entry point to the gui
+    GET    /jobsOverview            @de.kaufhof.hajobs.OverviewController.index()
+    
+    # Map static resources from the /public folder to the /assets URL path (used by frontend)
+    GET    /assets/*file            controllers.Assets.at(path = "/public", file)
+    
+A jobs overview page is available at http://localhost:9000/jobsOverview
 
 Use your preferred dependency injection mechanism to provide the managed `JobsController` to your application. Either by
 adding a new module to your application.conf or to your `ApplicationLoader`s load function.
@@ -368,6 +382,7 @@ adding a new module to your application.conf or to your `ApplicationLoader`s loa
 val jobManager = ... // the JobManager
 val jobTypes = ... // e.g. JobTypes(ProductImportJobType) in the 1st example
 new JobsController(jobManager, jobTypes, de.kaufhof.hajobs.routes.JobsController)
+new OverviewController //supplies the single page application gui
 ```
 
 The `de.kaufhof.hajobs.routes.JobsController` is the reverse router (`ReverseJobsController`) created by Play!
@@ -376,6 +391,8 @@ on compilation.
 Then you can manage your jobs via http, e.g. using the following for a job of `JobType("productimport")`:
 
 ```bash
+# get a list of all job types
+curl http://localhost:9000/jobs
 # get a list of all job executions
 curl http://localhost:9000/jobs/productimport
 # get redirected to the status of the latest job execution
@@ -384,6 +401,8 @@ curl -L http://localhost:9000/jobs/productimport/latest
 curl http://localhost:9000/jobs/productimport/a13037f0-9076-11e4-a8d6-4ff0e8bdfb24
 # execute the job
 curl -X POST http://localhost:9000/jobs/productimport
+# cancel the job execution
+curl -X DELETE http://localhost:9000/jobs/productimport
 ```
 
 ## License
