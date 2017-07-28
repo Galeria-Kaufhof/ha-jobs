@@ -209,6 +209,32 @@ class JobStatusRepository(session: Session,
       ))
   }
 
+  /**
+    * Returns all JobTypes for which jobs have been run at least once
+    * (i.e. which have an entry in the MetaTable)
+    */
+  def getAllActiveTypes() (implicit ec: ExecutionContext): Future[List[JobType]]= {
+    import scala.collection.JavaConversions._
+    // SELECT DISTINCT jobTypeColumn FROM MetaTable
+    val selectStmt = select(JobTypeColumn).distinct().from(MetaTable) // see https://datastax-oss.atlassian.net/browse/JAVA-475
+
+    session.executeAsync(selectStmt).map(res =>
+      res.all().toList.flatMap( result =>
+        rowToJobType(result)
+      ))
+  }
+
+  private def rowToJobType(row: Row): Option[JobType] = {
+    def table = "job_status_meta"
+
+    val jobTypeName = row.getString(JobTypeColumn)
+    jobTypes(jobTypeName) match {
+      case Some(jobType) => Option(jobType)
+      case None => logger.error(s"Could not find JobType for name: $jobTypeName(table $table)")
+        None
+    }
+  }
+
   private def rowToStatus(row: Row, isMeta: Boolean): Option[JobStatus] = {
 
     def table = if(isMeta) "job_status_meta" else "job_status_data"

@@ -242,7 +242,7 @@ class JobManager(managedJobs: => Jobs,
 
   def jobStatus(jobType: JobType, jobId: UUID): Future[Option[JobStatus]] = jobStatusRepo.get(jobType, jobId)
 
-  def getAllJobTypes(): Future[List[JobType]] = Future.successful(managedJobs.keys.toList)
+  def getAllJobTypes(): Future[List[JobType]] = jobStatusRepo.getAllActiveTypes()
 
   def getCronExpression(jobType: JobType): Option[String] = getJob(jobType).cronExpression
 
