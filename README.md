@@ -5,6 +5,10 @@
 Support for distributed, highly available (batch) singleton jobs, with job scheduling, locking, supervision and job status persistence.
 Implemented with Scala, Akka and Cassandra.
 
+## New in 1.7.7
+
+- fixes cancel-button (GUI)
+
 ## New in 1.7.6
 
 - fixes GUI bugs

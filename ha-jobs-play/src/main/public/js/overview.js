@@ -145,9 +145,9 @@ function retriggerJob(jobType) {
 
 function cancelJob(jobType) {
     return $.ajax({
-        type: "POST",
+        type: "DELETE",
         dataType: "json",
-        url: "/jobs/" + jobType + "/cancel"
+        url: "/jobs/" + jobType
     })
 }
 
