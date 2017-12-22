@@ -17,13 +17,6 @@ $(document).ready(function () {
     var itemTemplateSource = $("#item-template").html()
     var itemPopoverContentTemplateSource = $("#item-popover-content-template").html()
 
-    Handlebars.registerHelper('if_eq', function (a, b, opts) {
-        if (a == b) // Or === depending on your needs
-            return opts.fn(this)
-        else
-            return opts.inverse(this)
-    })
-
     jobsOverviewTemplate = Handlebars.compile(jobsEntryTemplateSource)
     jobTypeTabTemplate = Handlebars.compile(jobTypeTabTemplateSource)
     jobsEntryContentPlaceholderTemplate = Handlebars.compile(jobTypeTabContentTemplateSource)
@@ -33,8 +26,7 @@ $(document).ready(function () {
     itemPopoverContentTemplate = Handlebars.compile(itemPopoverContentTemplateSource)
     cronTemplate = Handlebars.compile(cronTemplateSource)
 
-    fetchAllJobs().then(renderOverview)
-    fetchJobTypes().then(renderTabs)
+    render()
 
     $('#tab-nav-placeholder [href="#Overview"]').on('click', function () {
         window.location.reload()
@@ -50,270 +42,74 @@ $(document).ready(function () {
     })
 
     //renderjson settings
-    renderjson.set_show_to_level(1) // first level is expanded
+    renderjson.set_show_to_level('all') // first level is expanded
         .set_max_string_length(99) // strings longer than 99 characters will be collapsed
 
 })
 
-function fetchAllJobs() {
-    return fetchJobTypes().then(function (response) {
-        var deferred = response.jobTypes.map(function (jobType) {
-            return fetchJobsByType(jobType)
-        })
-        return $.when.apply(null, deferred).done(function () {
-            var responses = Array.prototype.slice.call(arguments)
-            var allJobs = responses.map(function (response) {
-                var responseData = response[0]
-                var cron = responseData.cron
-                return responseData.jobs.map(function (job) {
-                    job.cron = cron
-                    job.jobDuration = calcDuration(job)
-                    return job
-                })
+function render() {
+    return fetchJobTypes()
+        .then(function (jobs) {
+            renderTabs(jobs)
+            var deferred = jobs.jobTypes.map(function (jobType) {
+                return fetchLatestJobByType(jobType)
             })
-            window.allJobs = allJobs
+            $.when.apply(null, deferred).done(function () {
+                var latestJobsJSON = deferred.map(function (res) { return res.responseJSON })
+                renderOverview(latestJobsJSON)
+            })
         })
-    })
 }
 
-function calcDuration(job) {
-    var startDate = UUIDToDate(job.jobId).getTime()
-    var statusDate = new Date(job.jobStatusTs).getTime()
-    var durationAsSeconds = moment.duration(statusDate - startDate).asSeconds()
-//var durationHR    = durationAsSeconds.humanize()
-    return (durationAsSeconds + " seconds")
-}
-
-function renderTabs(res) {   //Daten aus dem response body sind in data
+function renderTabs(res) {
     var compiledJobTypeTabHtml = jobTypeTabTemplate(res)
     var compiledJobTypeContentPlaceholderHtml = jobsEntryContentPlaceholderTemplate(res)
     $("#tab-nav-placeholder").append(compiledJobTypeTabHtml)
     $("#tab-content-placeholder").append(compiledJobTypeContentPlaceholderHtml)
     addOnTabClickListener()
-
-    res.jobTypes.forEach(function (jobType) {
-        getLatestJobDetailForJobType(jobType).then(renderJobDetail)
-    })
 }
 
-function renderOverview() {
-    function toLatestJobsArray(jobsByType) {
-        var latestJob = jobsByType[0]
-        return latestJob
-    }
-
-    var latestJobsArray = window.allJobs.map(toLatestJobsArray)
+function renderOverview(latestJobs) {
     var jobsObj = {}
-    jobsObj.jobs = latestJobsArray
+    jobsObj.jobs = latestJobs.map(function (job) {
+        job.jobDuration = calcDuration(job)
+        job.stateClass = statusToClass(job.jobState)
+        job.resultClass = statusToClass(job.jobResult)
+        return job
+    })
     var compiledJobsEntryHtml = jobsOverviewTemplate(jobsObj)
     $("#jobEntry-placeholder").html(compiledJobsEntryHtml)
-
-}
-
-function addTriggerJobEventListener(jobType) {
-    document.getElementById('trigger-' + jobType).addEventListener('click', onRetriggerClick.bind(null, jobType), false)
-}
-
-function addCancelJobEventListener(jobType) {
-    document.getElementById('cancel-' + jobType).addEventListener('click', onCancelClick.bind(null, jobType), false)
-}
-
-function addOnTabClickListener() {
-    $('[data-toggle="tab"]').on('shown.bs.tab', function (e) {
-
-        var target = $(e.target).attr("href") // activated tab
-        var jobType = target.substr(1, target.length)
-        updateTimeline(jobType)
-    })
-}
-
-function fetchJobsByType(jobType) {
-    return $.ajax({
-        type: "GET",
-        dataType: "json",
-        url: "/jobs/" + jobType
-    })
-}
-
-function retriggerJob(jobType) {
-    return $.ajax({
-        type: "POST",
-        dataType: "json",
-        url: "/jobs/" + jobType
-    })
-}
-
-function cancelJob(jobType) {
-    return $.ajax({
-        type: "DELETE",
-        dataType: "json",
-        url: "/jobs/" + jobType
-    })
-}
-
-function onRetriggerClick(jobType) {
-    retriggerJob(jobType)
-        .then(function(res){
-            res.action = 'trigger'
-            document.getElementById('trigger-' + jobType).disabled = true;
-            refreshJobDetails(res, jobType)
-        })
-}
-
-function onCancelClick(jobType) {
-    cancelJob(jobType)
-        .then(function(res){
-            res.action = 'cancel'
-            document.getElementById('cancel-' + jobType).disabled = true;
-            refreshJobDetails(res, jobType)
-        })
-}
-
-function refreshJobDetails(res, jobType) {
-    var result = (res.status === 'OK') ? 'success' : 'error'
-    var context = {}
-    context.action = res.action
-    context.style = result
-    context.info = JSON.stringify(res, undefined, 2)
-    var compiledAlert = alertTemplate(context)
-    $("#jobEntry-placeholder-" + jobType).append(compiledAlert)
-    setTimeout(function () {
-        getLatestJobDetailForJobType(jobType)
-            .then(renderJobDetail)
-            .then(function () {
-                $("[data-toggle='popover']").popover('hide')
-            })
-            .then(function () {
-                updateTimeline(jobType)
-            }).then(function () {
-            $(".popover").remove()
-        })
-    }, 2000)
-}
-
-
-function fetchJobTypes() {
-    return $.ajax({
-        type: "GET",
-        dataType: "json",
-        url: "/jobs"
-    })
-}
-
-function getLatestJobDetailForJobType(jobType) {
-    return $.ajax({
-        type: "GET",
-        dataType: "json",
-        url: "/jobs/" + jobType + "/latest"
-    })
 }
 
 function renderJobDetail(latestJobForType) {
     var jobType = latestJobForType.jobType
-    var compiledJobsEntryLatestHtml = jobsEntryLatestTemplate(latestJobForType)
-    //var compiledCronHtml = cronTemplate(latestJobForType.cron)
-    var latestJobWithCron = getJobsByType(jobType)
-    var jobCron = latestJobWithCron [0][0].cron
-    var pretty = ""
-    var nextRun = ""
-    if(jobCron){
-        pretty = cronstrue.toString(jobCron)
-        console.log(pretty)
-
-    } else {
-        pretty = 'no CRON expression set'
-    }
-    var compiledCronHtml = cronTemplate({
-        pretty: pretty,
-        cron: jobCron
-    })
-    $("#jobEntry-placeholder-" + jobType).html(compiledJobsEntryLatestHtml)
-    // Pretty print job content and append to dom
-    $(".content-"+latestJobForType.jobId).html(renderjson(latestJobForType.content))
-    $("#cron-" + jobType).html(compiledCronHtml)
-    addTriggerJobEventListener(jobType)
-    addCancelJobEventListener(jobType)
-    return fetchAllJobs().then(function () {
-        return createTimeline(jobType)
-    })
-}
-
-function UUIDToIntTime(uuid) {
-    var uuidArray = uuid.split('-'),
-        timeStr = [
-            uuidArray[2].substring(1),
-            uuidArray[1],
-            uuidArray[0]
-        ].join('')
-    return parseInt(timeStr, 16)
-}
-
-function UUIDToDate(uuid) {
-    var intTime = UUIDToIntTime(uuid),
-        ms = Math.floor((intTime - 122192928000000000 ) / 10000)
-    return new Date(ms)
-}
-
-function jobToVisDataSet(job) {
-    var end = new Date(job.jobStatusTs)
-    var begin = new Date(UUIDToDate(job.jobId))
-    var res = {
-        id: job.jobId,
-        start: UUIDToDate(job.jobId),
-        content: job,
-        editable: false,
-        selectable: false,
-        className: statusToClass(job.jobState)
-    }
-
-    if (end.getTime() - begin.getTime() > 60 * 1000){ // only set end value for jobs that have a runtime of at least one minute
-        res.end = job.jobStatusTs
-    }
-
-    return res
-}
-
-function statusToClass(jobState) {
-    switch (jobState) {
-        case"FAILED":
-            return "bg-danger"
-        case"RUNNING":
-            return "bg-warning"
-        case"FINISHED":
-            return "bg-success"
-        default:
-            return "bg-info"
-    }
-}
-
-function updateTimeline(jobType) {
-    return fetchAllJobs().then(function () {
-        var jobsData = getJobsByType(jobType)[0]
-        var dataSet = jobsData.map(jobToVisDataSet)
-        var items = new vis.DataSet(dataSet)
-        var timelineToUpdate = window.timelines[jobType]
-        timelineToUpdate.setData(items)
-
-        jobsData.forEach(function (job) {
-            var popoverDetails = itemPopoverContentTemplate(job)
-            $('[data-jobId="' + job.jobId + '"]').popover({html: true, content: popoverDetails})
+    latestJobForType.stateClass = statusToClass(latestJobForType.jobState)
+    latestJobForType.resultClass = statusToClass(latestJobForType.jobResult)
+    fetchJobByType(jobType).then(function (job) {
+        var compiledJobsEntryLatestHtml = jobsEntryLatestTemplate(latestJobForType)
+        //var compiledCronHtml = cronTemplate(latestJobForType.cron)
+        var latestJobs = job.jobs
+        var jobCron = job.cron
+        var pretty = jobCron ? cronstrue.toString(jobCron) : "no CRON expression set"
+        var compiledCronHtml = cronTemplate({
+            pretty: pretty,
+            cron: jobCron
         })
+        $("#jobEntry-placeholder-" + jobType).html(compiledJobsEntryLatestHtml)
+        // Pretty print job content and append to dom
+        $(".content-"+latestJobForType.jobId).html(renderjson(latestJobForType.content))
+        $("#cron-" + jobType).html(compiledCronHtml)
+        addTriggerJobEventListener(jobType)
+        addCancelJobEventListener(jobType)
+        createTimeline(jobType, latestJobs)
     })
 }
 
-function getJobsByType(jobType) {
-    return window.allJobs.filter(function (jobs) {
-        return jobs[0].jobType === jobType
-    })
-}
-
-function createTimeline(jobType) {
-    var jobsData = getJobsByType(jobType)
-
+function createTimeline(jobType, latestJobs) {
     var container = document.getElementById('timeline-' + jobType)
 
 // Create a DataSet (allows two way data-binding)
-    var dataSet = jobsData[0].map(jobToVisDataSet)
+    var dataSet = latestJobs.map(jobToVisDataSet)
 
     var items = new vis.DataSet(dataSet)
 
@@ -333,4 +129,169 @@ function createTimeline(jobType) {
     var timeline = new vis.Timeline(container, items, options)
     window.timelines[jobType] = timeline
     //timeline.fit()
+
+// Add Popover
+    latestJobs.forEach(function (job) {
+        var popoverDetails = itemPopoverContentTemplate(job)
+        $('[data-jobId="' + job.jobId + '"]').popover({html: true, content: popoverDetails})
+    })
+}
+
+function refreshJobDetails(res, jobType) {
+    var result = (res.status === 'OK') ? 'success' : 'error'
+    var context = {}
+    context.action = res.action
+    context.style = result
+    context.info = JSON.stringify(res, undefined, 2)
+    var compiledAlert = alertTemplate(context)
+    $("#jobEntry-placeholder-" + jobType).append(compiledAlert)
+    setTimeout(function () {
+        fetchLatestJobByType(jobType)
+            .then(renderJobDetail)
+    }, 2000)
+}
+
+// EVENTHANDLER
+
+function addOnTabClickListener() {
+    $('[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+        var target = $(e.target).attr("href") // activated tab
+        var jobType = target.substr(1, target.length)
+        fetchLatestJobByType(jobType).then(renderJobDetail)
+    })
+}
+
+function addTriggerJobEventListener(jobType) {
+    setupEventListener(jobType, 'trigger', onRetriggerClick)
+}
+
+function addCancelJobEventListener(jobType) {
+    setupEventListener(jobType, 'cancel', onCancelClick)
+}
+
+function onRetriggerClick(jobType) {
+    if (confirm('Retriggering ' + jobType + '\n Are you sure?')) {
+        retriggerJob(jobType)
+            .then(function(res){
+                disableButtonsAndUpdateDetails(jobType, res, 'trigger')
+            })
+    }
+}
+
+function onCancelClick(jobType) {
+    if (confirm('Canceling ' + jobType + '\n Are you sure?')) {
+        cancelJob(jobType)
+            .then(function(res){
+                disableButtonsAndUpdateDetails(jobType, res, 'cancel')
+            })
+    }
+}
+
+function setupEventListener(jobType, action, fn) {
+    document.getElementById(action + '-' + jobType).addEventListener('click', fn.bind(null, jobType), false)
+}
+
+function disableButtonsAndUpdateDetails(jobType, res, action) {
+    res.action = action
+    document.getElementById(action + '-' + jobType).disabled = true;
+    refreshJobDetails(res, jobType)
+}
+
+// AJAX CALLS
+
+function fetchJobTypes() {
+    return ajaxRequst("GET")
+}
+
+function fetchLatestJobByType(type) {
+    const path = type + "/latest"
+    return ajaxRequst("GET", path)
+}
+
+function fetchJobByType(type) {
+    return ajaxRequst("GET", type)
+}
+
+function retriggerJob(type) {
+    return ajaxRequst("POST", type)
+}
+
+function cancelJob(type) {
+    return ajaxRequst("DELETE", type)
+}
+
+function ajaxRequst(type, path) {
+    const url = path ? "/jobs/" + path : "/jobs"
+    return $.ajax({
+        type: type,
+        dataType: "json",
+        url: url
+    })
+}
+
+// HELPER
+function calcDuration(job) {
+    var startDate = UUIDToDate(job.jobId).getTime()
+    var statusDate = new Date(job.jobStatusTs).getTime()
+    var durationAsSeconds = moment.duration(statusDate - startDate).asSeconds()
+//var durationHR    = durationAsSeconds.humanize()
+    return (durationAsSeconds + " seconds")
+}
+
+function UUIDToIntTime(uuid) {
+    var uuidArray = uuid.split('-'),
+        timeStr = [
+            uuidArray[2].substring(1),
+            uuidArray[1],
+            uuidArray[0]
+        ].join('')
+    return parseInt(timeStr, 16)
+}
+
+function UUIDToDate(uuid) {
+    var intTime = UUIDToIntTime(uuid),
+        ms = Math.floor((intTime - 122192928000000000 ) / 10000)
+    return new Date(ms)
+}
+
+function jobToVisDataSet(job) {
+    job.jobDuration = calcDuration(job)
+    job.stateClass = statusToClass(job.jobState)
+    job.resultClass = statusToClass(job.jobResult)
+    var end = new Date(job.jobStatusTs)
+    var begin = new Date(UUIDToDate(job.jobId))
+    var res = {
+        id: job.jobId,
+        start: UUIDToDate(job.jobId),
+        content: job,
+        editable: false,
+        selectable: false,
+        className: "bg-" + statusToClass(job.jobState),
+    }
+
+    if (end.getTime() - begin.getTime() > 60 * 1000){ // only set end value for jobs that have a runtime of at least one minute
+        res.end = job.jobStatusTs
+    }
+
+    return res
+}
+
+function statusToClass(state) {
+    switch (state) {
+        case "RUNNING":
+        case "PREPARING":
+        case "SKIPPED":
+            return "info"
+        case "FAILED":
+        case "WARNING":
+        case "PENNDING":
+            return "danger"
+        case "SUCCESS":
+        case "FINISHED":
+        case "NO_ACTION_NEEDED":
+            return "success"
+        case "RUNNING":
+        case "CANCELED":
+            return "warning"
+    }
 }
