@@ -1,6 +1,5 @@
 package de.kaufhof.hajobs
 
-import java.lang.RuntimeException
 import java.util.{TimeZone, UUID}
 
 import akka.pattern.ask
