@@ -1,5 +1,6 @@
 package de.kaufhof.hajobs
 
+import java.lang.RuntimeException
 import java.util.{TimeZone, UUID}
 
 import akka.pattern.ask
@@ -88,27 +89,32 @@ class JobManager(managedJobs: => Jobs,
       jobToSchedule.cronExpression match {
         case Some(cronExpression) =>
           logger.debug("scheduling job for {}", jobType)
-          val job = JobBuilder
-            .newJob(classOf[TriggerPuller])
-            .usingJobData(TPData(jobType, this).asDataMap)
-            .build()
+          if(org.quartz.CronExpression.isValidExpression(cronExpression)) {
+            val job = JobBuilder
+              .newJob(classOf[TriggerPuller])
+              .usingJobData(TPData(jobType, this).asDataMap)
+              .build()
 
-          val jobName = jobType.name
+            val jobName = jobType.name
 
-          val trigger = TriggerBuilder
-            .newTrigger
-            .withIdentity(s"$jobName-trigger")
-            .withSchedule(CronScheduleBuilder
-            // this will throw an exception if the expression is incorrect
-            .cronSchedule(cronExpression)
-              .inTimeZone(schedulesTimeZone)
-            ).build()
+            val trigger = TriggerBuilder
+              .newTrigger
+              .withIdentity(s"$jobName-trigger")
+              .withSchedule(CronScheduleBuilder
+              // this will throw an exception if the expression is incorrect
+              .cronSchedule(cronExpression)
+                .inTimeZone(schedulesTimeZone)
+              ).build()
 
-          scheduler.scheduleJob(job, trigger)
+            scheduler.scheduleJob(job, trigger)
 
-          logger.info("Job '{}' has cron expression '{}', first execution at {}", jobType, trigger.getCronExpression, trigger.getNextFireTime)
+            logger.info("Job '{}' has cron expression '{}', first execution at {}", jobType, trigger.getCronExpression, trigger.getNextFireTime)
 
-          runJobNowIfPreviousRunWasSkipped(cronExpression, jobType).map(_ => ())
+            runJobNowIfPreviousRunWasSkipped(cronExpression, jobType).map(_ => ())
+          } else {
+            logger.info("Invalid cronExpression defined for job {}", jobType)
+            Future.successful(())
+          }
         case None =>
           logger.info("No cronExpression defined for job {}", jobType)
           Future.successful(())
