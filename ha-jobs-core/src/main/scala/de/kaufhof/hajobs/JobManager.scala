@@ -100,8 +100,8 @@ class JobManager(managedJobs: => Jobs,
               .newTrigger
               .withIdentity(s"$jobName-trigger")
               .withSchedule(CronScheduleBuilder
-              // this will throw an exception if the expression is incorrect
-              .cronSchedule(cronExpression)
+                // this will throw an exception if the expression is incorrect
+                .cronSchedule(cronExpression)
                 .inTimeZone(schedulesTimeZone)
               ).build()
 
@@ -246,6 +246,10 @@ class JobManager(managedJobs: => Jobs,
   def allJobStatus(jobType: JobType, limit: Int = 20): Future[List[JobStatus]] = jobStatusRepo.list(jobType, limit)
 
   def jobStatus(jobType: JobType, jobId: UUID): Future[Option[JobStatus]] = jobStatusRepo.get(jobType, jobId)
+
+  def getAllJobTypes(): Future[List[JobType]] = jobStatusRepo.getAllActiveTypes()
+
+  def getCronExpression(jobType: JobType): Option[String] = getJob(jobType).cronExpression
 
   private[hajobs] def retriggerCounts: Map[JobType, Int] = managedJobs.map { case (jobType, job) =>
     jobType -> job.retriggerCount
